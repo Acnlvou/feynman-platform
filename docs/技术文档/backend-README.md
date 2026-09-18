@@ -142,5 +142,5 @@ curl http://localhost:3000/api/knowledge-points -H "x-auth-token: <TOKEN>"
 ## 相关文档
 
 - [`backend-errata.md`](backend-errata.md) —— 讲义勘误说明（本工程相对讲义的 10 处修正）
-- [`../project-plan/`](../project-plan/) —— 项目规划文档
-- [`../project-plan/00 费曼学习平台·全项目执行计划.md`](../project-plan/00%20费曼学习平台·全项目执行计划.md) —— 全项目路线图
+- [`../项目计划/`](../项目计划/) —— 项目规划文档
+- [`../项目计划/00 费曼学习平台·全项目执行计划.md`](../项目计划/00%20费曼学习平台·全项目执行计划.md) —— 全项目路线图

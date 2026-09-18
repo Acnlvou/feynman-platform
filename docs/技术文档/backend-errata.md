@@ -1,6 +1,6 @@
 # 讲义勘误说明
 
-> 本文档位于 `docs/technical/`；后端工程位于 `backend/`，课程讲义、计划文档和变更记录分别位于 `docs/course-notes/`、`docs/project-plan/` 和 `docs/change-log/`。
+> 本文档位于 `docs/技术文档/`；后端工程位于 `backend/`，课程讲义、计划文档和变更记录分别位于 `docs/课程讲义/`、`docs/项目计划/` 和 `docs/变更记录/`。
 
 本文档记录「费曼学习平台后端」实际实现时，对《大前端与AI实战》第 1–3 课讲义所做的修正。
 
