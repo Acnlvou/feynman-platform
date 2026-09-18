@@ -1,5 +1,7 @@
 # 费曼学习平台 · 后端
 
+> Web 框架：**Express 4**；运行时：**Node.js**；数据库：**MongoDB Atlas**，通过 **Mongoose** 连接。
+
 《大前端与AI实战》实训课第 1–3 课的实战产物：一个基于 Node.js + Express + MongoDB 的后端服务，提供用户注册/登录（JWT 认证）与知识点 CRUD 能力。
 
 ## 环境要求

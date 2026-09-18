@@ -2,13 +2,13 @@
 
 《大前端与 AI 实战》64 学时 / 16 次课的贯穿式项目。
 
-> 统一仓库说明：后端代码、课程讲义、项目计划、技术说明、变更记录和参考材料均收纳在本目录；文档按用途放入 `docs/`，后端工程放入 `backend/`。
+> 统一仓库说明：后端代码、后续前端代码、课程讲义、项目计划、技术说明、变更记录和参考材料均收纳在本目录；文档按用途放入 `docs/`，后端工程放入 `backend/`，前端工程放入 `front/`。
 
 ## 当前进度
 
 - 已完成第 1–3 次课：Express 服务、用户注册/登录、JWT 认证、知识点 CRUD。
 - 已整理第 1–6 次课讲义，作为 `docs/course-notes/` 的课程资料。
-- 当前下一阶段：第 4–6 次课前端工程与前后端联调（React + Vite、认证状态、知识点界面）。
+- 当前下一阶段：第 4–6 次课前端工程与前后端联调（React + Vite、认证状态、知识点界面），代码统一放在 `front/`。
 - 后端语法检查已通过；是否连接 MongoDB Atlas 取决于本地 `backend/.env` 配置。
 
 ## 目录结构
@@ -25,6 +25,8 @@ feynman-platform/
 │   ├── utils/
 │   ├── package.json
 │   └── .env.example
+├── front/                            # 后续 React + Vite 前端代码
+│   └── README.md
 └── docs/
     ├── course-notes/                 # 第 1–6 次课《大前端与 AI 实战》讲义
     ├── project-plan/                 # 全项目路线图与阶段实施计划
@@ -32,6 +34,17 @@ feynman-platform/
     ├── change-log/                   # 按日期记录项目变更
     └── reference/slides/             # PPT 与课程参考材料
 ```
+
+## 后端技术栈
+
+后端使用的是 **Node.js + Express 4** 框架，数据库层使用 **Mongoose** 连接 **MongoDB Atlas**。此外还使用：
+
+- `bcryptjs`：密码哈希
+- `jsonwebtoken`：JWT 登录认证
+- `dotenv`：环境变量配置
+- `cors`：跨域请求处理
+
+所以更准确地说：**后端 Web 框架是 Express，运行时是 Node.js，数据库是 MongoDB。**
 
 ## 快速启动后端
 
