@@ -8,8 +8,9 @@
 
 - 已完成第 1–3 次课：Express 服务、用户注册/登录、JWT 认证、知识点 CRUD。
 - 已整理第 1–6 次课讲义，作为 `docs/课程讲义/` 的课程资料。
-- 当前下一阶段：第 4–6 次课前端工程与前后端联调（React + Vite、认证状态、知识点界面），代码统一放在 `front/`。
-- 后端语法检查已通过；是否连接 MongoDB Atlas 取决于本地 `backend/.env` 配置。
+- 已完成第 4 次课前端起步与第 5 次课核心联调：React + Vite、路由、登录/注册、认证状态、路由守卫、知识点列表与创建/删除。
+- 前端代码统一放在 `front/`；下一阶段继续完善知识点编辑、富文本/Markdown 渲染和复习功能。
+- 后端语法检查已通过；MongoDB Atlas 是否可用取决于本地 `backend/.env` 配置和后端进程是否在读取最新配置。
 
 ## 目录结构
 
@@ -25,7 +26,9 @@ feynman-platform/
 │   ├── utils/
 │   ├── package.json
 │   └── .env.example
-├── front/                            # 后续 React + Vite 前端代码
+├── front/                            # React + Vite 前端代码
+│   ├── src/
+│   ├── package.json
 │   └── README.md
 └── docs/
     ├── 课程讲义/                      # 第 1–6 次课《大前端与 AI 实战》讲义
