@@ -11,10 +11,15 @@
   "dependencies": {
     "@vitejs/plugin-react": "latest",
     "axios": "latest",
-    "vite": "latest",
+    "katex": "^0.16.47",
+    "mermaid": "^12.2.0",
     "react": "latest",
     "react-dom": "latest",
-    "react-router-dom": "latest"
-  },
-  "devDependencies": {}
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "latest",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "vite": "latest"
+  }
 }
