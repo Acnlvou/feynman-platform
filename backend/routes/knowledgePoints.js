@@ -2,7 +2,6 @@
 // 挂载于 /api/knowledge-points，本模块所有接口都需要先登录
 
 const express = require('express');
-const mongoose = require('mongoose');
 const KnowledgePoint = require('../models/KnowledgePoint');
 const auth = require('../middleware/auth');
 const { createResponse } = require('../utils/response');
@@ -16,7 +15,7 @@ router.use(auth);
 async function findOwned(req, res) {
   const { id } = req.params;
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!id || id.length > 128) {
     res.status(400).json(createResponse(false, null, '知识点 ID 格式不正确'));
     return null;
   }
@@ -28,7 +27,7 @@ async function findOwned(req, res) {
   }
 
   // 只能操作自己的知识点
-  if (kp.user.toString() !== req.user.id) {
+  if (String(kp.user) !== String(req.user.id)) {
     res.status(403).json(createResponse(false, null, '无权操作他人的知识点'));
     return null;
   }
@@ -39,10 +38,19 @@ async function findOwned(req, res) {
 // POST /api/knowledge-points —— 创建
 router.post('/', async (req, res, next) => {
   try {
-    const { title, content, status, reviewList } = req.body;
+    const { status, reviewList } = req.body;
+    const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
+    const content = typeof req.body.content === 'string' ? req.body.content : '';
 
     if (!title || !content) {
       return res.status(400).json(createResponse(false, null, '标题和内容均为必填'));
+    }
+
+    if (status !== undefined && !['not_started', 'in_progress', 'mastered'].includes(status)) {
+      return res.status(400).json(createResponse(false, null, '知识点状态不正确'));
+    }
+    if (reviewList !== undefined && typeof reviewList !== 'boolean') {
+      return res.status(400).json(createResponse(false, null, '复习列表标记必须为布尔值'));
     }
 
     const kp = await KnowledgePoint.create({
@@ -62,7 +70,7 @@ router.post('/', async (req, res, next) => {
 // GET /api/knowledge-points —— 查询当前用户的全部知识点
 router.get('/', async (req, res, next) => {
   try {
-    const list = await KnowledgePoint.find({ user: req.user.id }).sort({ createdAt: -1 });
+    const list = await KnowledgePoint.findByUser(req.user.id);
     res.json(createResponse(true, list, '查询成功'));
   } catch (err) {
     next(err);
@@ -86,14 +94,39 @@ router.put('/:id', async (req, res, next) => {
     const kp = await findOwned(req, res);
     if (!kp) return;
 
-    const { title, content, status, reviewList } = req.body;
-    if (title !== undefined) kp.title = title;
-    if (content !== undefined) kp.content = content;
-    if (status !== undefined) kp.status = status;
-    if (reviewList !== undefined) kp.reviewList = reviewList;
+    const { status, reviewList } = req.body;
+    const updates = {};
 
-    await kp.save();
-    res.json(createResponse(true, kp, '知识点更新成功'));
+    if (req.body.title !== undefined) {
+      if (typeof req.body.title !== 'string' || !req.body.title.trim()) {
+        return res.status(400).json(createResponse(false, null, '标题不能为空'));
+      }
+      updates.title = req.body.title.trim();
+    }
+    if (req.body.content !== undefined) {
+      if (typeof req.body.content !== 'string' || !req.body.content) {
+        return res.status(400).json(createResponse(false, null, '内容不能为空'));
+      }
+      updates.content = req.body.content;
+    }
+    if (status !== undefined) {
+      if (!['not_started', 'in_progress', 'mastered'].includes(status)) {
+        return res.status(400).json(createResponse(false, null, '知识点状态不正确'));
+      }
+      updates.status = status;
+    }
+    if (reviewList !== undefined) {
+      if (typeof reviewList !== 'boolean') {
+        return res.status(400).json(createResponse(false, null, '复习列表标记必须为布尔值'));
+      }
+      updates.reviewList = reviewList;
+    }
+
+    const updated = await KnowledgePoint.updateById(kp._id, updates);
+    if (!updated) {
+      return res.status(404).json(createResponse(false, null, '知识点不存在'));
+    }
+    res.json(createResponse(true, updated, '知识点更新成功'));
   } catch (err) {
     next(err);
   }
@@ -105,7 +138,7 @@ router.delete('/:id', async (req, res, next) => {
     const kp = await findOwned(req, res);
     if (!kp) return;
 
-    await kp.deleteOne();
+    await KnowledgePoint.deleteById(kp._id);
     res.json(createResponse(true, null, '知识点删除成功'));
   } catch (err) {
     next(err);

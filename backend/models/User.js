@@ -1,29 +1,30 @@
-// 用户模型（对应讲义第 2 课）
-// 注意：讲义第 3 课的路由里误用了 name 字段，这里统一为 username（见 errata.md 第 1 条）
+const { runDatabaseRequest } = require('../config/cloudbase');
 
-const mongoose = require('mongoose');
+const COLLECTION = 'users';
 
-const userSchema = new mongoose.Schema(
-  {
-    username: {
-      type: String,
-      required: [true, '用户名不能为空'],
-      unique: true,
-      trim: true,
-    },
-    email: {
-      type: String,
-      required: [true, '邮箱不能为空'],
-      unique: true,
-      trim: true,
-      lowercase: true,
-    },
-    password: {
-      type: String,
-      required: [true, '密码不能为空'],
-    },
-  },
-  { timestamps: true }
-);
+function documentsFrom(result) {
+  if (Array.isArray(result.data)) return result.data;
+  return result.data ? [result.data] : [];
+}
 
-module.exports = mongoose.model('User', userSchema);
+async function findOne(criteria) {
+  return runDatabaseRequest(async (db) => {
+    const result = await db.collection(COLLECTION).where(criteria).limit(1).get();
+    return documentsFrom(result)[0] || null;
+  });
+}
+
+async function create({ username, email, password }) {
+  return runDatabaseRequest(async (db) => {
+    const now = new Date();
+    const user = { username, email, password, createdAt: now, updatedAt: now };
+    const result = await db.collection(COLLECTION).add(user);
+    return { ...user, _id: result.id };
+  });
+}
+
+async function deleteById(id) {
+  return runDatabaseRequest((db) => db.collection(COLLECTION).doc(id).remove());
+}
+
+module.exports = { create, deleteById, findOne };

@@ -2,16 +2,16 @@
 // 费曼学习平台 · 后端入口
 // 对应讲义：《大前端与AI实战》第 1～3 课
 //  第 1 课：Express Hello World
-//  第 2 课：dotenv / cors / Mongoose 接数据库 / 用户注册
+//  第 2 课：dotenv / cors / CloudBase SDK 数据库访问 / 用户注册
 //  第 3 课：JWT 登录、认证中间件、知识点 CRUD
 // ============================================================
 
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env'), quiet: true });
 
 const errorHandler = require('./middleware/errorHandler');
+const { checkConnection, hasCloudBaseConfig } = require('./config/cloudbase');
 
 const app = express();
 
@@ -39,28 +39,24 @@ if (!process.env.JWT_SECRET) {
   console.warn('       请复制 .env.example 为 .env 并填写 JWT_SECRET。');
 }
 
-// ---------------- 数据库连接 ----------------
-// 未连接数据库时让操作快速失败，而不是无限挂起
-mongoose.set('bufferCommands', false);
-
-if (!process.env.MONGO_URI) {
-  console.warn('[警告] 未检测到 MONGO_URI，所有数据库相关接口将不可用。');
-  console.warn('       请复制 .env.example 为 .env 并填写 Atlas 连接串。');
-} else {
-  mongoose
-    .connect(process.env.MONGO_URI)
-    .then(() => console.log(`[数据库] MongoDB 连接成功：${mongoose.connection.host}`))
-    .catch((err) => {
-      // 故意不 process.exit：无数据库时服务照常启动，便于本地调试其它功能
-      console.error('[数据库] MongoDB 连接失败（服务仍继续运行）：', err.message);
-    });
-}
-
 // ---------------- 启动服务 ----------------
-const PORT = process.env.PORT || 3000;
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`[服务] 费曼学习平台后端已启动：http://localhost:${PORT}`);
-});
+  app.listen(PORT, () => {
+    console.log(`[服务] 费曼学习平台后端已启动：http://localhost:${PORT}`);
+
+    if (!hasCloudBaseConfig()) {
+      console.warn('[警告] 未检测到 CLOUDBASE_ENV_ID 或 CLOUDBASE_APIKEY，数据库接口暂不可用。');
+      return;
+    }
+
+    checkConnection()
+      .then(() => console.log('[数据库] CloudBase 文档数据库连接成功。'))
+      .catch((err) => {
+        console.error(`[数据库] CloudBase 连接失败：${err.code || err.name}${err.requestId ? ` (requestId: ${err.requestId})` : ''}`);
+      });
+  });
+}
 
 module.exports = app;

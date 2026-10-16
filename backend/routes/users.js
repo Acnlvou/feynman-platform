@@ -21,16 +21,32 @@ function signToken(user) {
 // POST /api/users/register —— 注册成功后直接返回 Token（注册即登录）
 router.post('/register', async (req, res, next) => {
   try {
-    const { username, email, password } = req.body;
+    const rawUsername = req.body.username;
+    const rawEmail = req.body.email;
+    const password = req.body.password;
 
-    if (!username || !email || !password) {
+    if (
+      typeof rawUsername !== 'string' ||
+      typeof rawEmail !== 'string' ||
+      typeof password !== 'string' ||
+      !rawUsername.trim() ||
+      !rawEmail.trim() ||
+      !password
+    ) {
       return res.status(400).json(createResponse(false, null, '用户名、邮箱、密码均为必填'));
     }
 
-    // 用户名与邮箱都要查重（修正讲义第 3 课只查邮箱的问题）
-    const existing = await User.findOne({ $or: [{ email }, { username }] });
-    if (existing) {
-      const field = existing.username === username ? '用户名' : '邮箱';
+    const username = rawUsername.trim();
+    const email = rawEmail.trim().toLowerCase();
+
+    // 用户名与邮箱都要查重（修正讲义第 3 课只查邮箱的问题）。
+    // CloudBase 文档库不使用 Mongoose 的 $or 查询，这里分别查询以保持兼容。
+    const [existingUsername, existingEmail] = await Promise.all([
+      User.findOne({ username }),
+      User.findOne({ email }),
+    ]);
+    if (existingUsername || existingEmail) {
+      const field = existingUsername ? '用户名' : '邮箱';
       return res.status(400).json(createResponse(false, null, `该${field}已被注册`));
     }
 
@@ -48,12 +64,14 @@ router.post('/register', async (req, res, next) => {
 // POST /api/users/login
 router.post('/login', async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const rawEmail = req.body.email;
+    const password = req.body.password;
 
-    if (!email || !password) {
+    if (typeof rawEmail !== 'string' || typeof password !== 'string' || !rawEmail.trim() || !password) {
       return res.status(400).json(createResponse(false, null, '邮箱和密码均为必填'));
     }
 
+    const email = rawEmail.trim().toLowerCase();
     const user = await User.findOne({ email });
     // 用户不存在与密码错误返回同一提示，避免暴露账号是否已注册
     if (!user) {

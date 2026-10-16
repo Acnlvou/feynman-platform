@@ -7,10 +7,10 @@
 ## 当前进度
 
 - 已完成第 1–3 次课：Express 服务、用户注册/登录、JWT 认证、知识点 CRUD。
-- 已整理第 1–6 次课讲义，作为 `docs/课程讲义/` 的课程资料。
+- 已整理第 1–16 次课讲义、第 7.5 次进阶课及第 8 课的三个版本，共 19 份文稿课程资料；原有路径调整版与文稿原版均保留。
 - 已完成第 4 次课前端起步与第 5 次课核心联调：React + Vite、路由、登录/注册、认证状态、路由守卫、知识点列表与创建/删除。
 - 前端代码统一放在 `front/`；下一阶段继续完善知识点编辑、富文本/Markdown 渲染和复习功能。
-- 后端语法检查已通过；MongoDB Atlas 是否可用取决于本地 `backend/.env` 配置和后端进程是否在读取最新配置。
+- 后端已接通腾讯云 CloudBase 文档数据库，真实注册/登录、知识点增删改查、用户权限隔离和重启后的数据保留已验证。
 
 ## 目录结构
 
@@ -18,7 +18,7 @@
 feynman-platform/
 ├── README.md                         # 项目入口说明
 ├── .gitignore                        # 统一仓库忽略规则
-├── backend/                          # Node.js + Express + MongoDB 后端
+├── backend/                          # Node.js + Express + CloudBase 后端
 │   ├── index.js
 │   ├── models/
 │   ├── routes/
@@ -31,7 +31,7 @@ feynman-platform/
 │   ├── package.json
 │   └── README.md
 └── docs/
-    ├── 课程讲义/                      # 第 1–6 次课《大前端与 AI 实战》讲义
+    ├── 课程讲义/                      # 第 1–16 次课、进阶课及多版本讲义
     ├── 项目计划/                      # 全项目路线图与阶段实施计划
     ├── 技术文档/                      # 后端 README、讲义勘误等技术说明
     ├── 变更记录/                      # 按日期记录项目变更
@@ -40,33 +40,38 @@ feynman-platform/
 
 ## 后端技术栈
 
-后端使用的是 **Node.js + Express 4** 框架，数据库层使用 **Mongoose** 连接 **MongoDB Atlas**。此外还使用：
+后端使用 **Node.js + Express 4**，通过 CloudBase 服务端 SDK 访问腾讯云文档数据库。课程讲义仍保留 Mongoose/Atlas 的教学示例；当前工程的 CloudBase 配置不使用 `MONGO_URI`。此外还使用：
 
 - `bcryptjs`：密码哈希
 - `jsonwebtoken`：JWT 登录认证
 - `dotenv`：环境变量配置
 - `cors`：跨域请求处理
 
-所以更准确地说：**后端 Web 框架是 Express，运行时是 Node.js，数据库是 MongoDB。**
+后端 Web 框架是 **Express**，运行时是 **Node.js**，持久存储使用 **腾讯云 CloudBase 文档数据库**。
 
 ## 快速启动后端
+
+本机已配置好数据库，可双击根目录的 `启动项目.command`，同时启动前端与后端；在启动窗口按 Ctrl+C 会停止两者。脚本优先使用本机已有的 Codex Node.js，其他电脑使用系统 Node.js，无需额外安装运行时。
+
+以下步骤适用于首次配置的新电脑；已有 `.env` 时请保留原配置：
 
 ```bash
 cd backend
 npm install
 cp .env.example .env
-# 编辑 .env，至少填写 MONGO_URI 与 JWT_SECRET
+# 编辑 .env，填写 CLOUDBASE_APIKEY 与 JWT_SECRET
 npm start
 ```
 
 启动后访问 <http://localhost:3000/>，应看到 `Hello, Feynman Learner!`。
 
-即使没有配置 MongoDB，后端也会启动；数据库相关接口会返回明确的未连接提示。完整接口清单和测试示例见 [`docs/技术文档/backend-README.md`](docs/技术文档/backend-README.md)。
+即使没有配置 CloudBase，后端也会启动；数据库相关接口会返回明确的未连接提示。完整接口清单和测试示例见 [`docs/技术文档/backend-README.md`](docs/技术文档/backend-README.md)。
 
 ## 文档导航
 
 ### 课程讲义
 
+- [全部 19 份文稿讲义总目录](docs/课程讲义/README.md)
 - [第 1 次课：导论与后端初探](docs/课程讲义/01《大前端与AI实战》第一次课程：导论与后端初探.md)
 - [第 2 次课：API 设计与数据库实战](docs/课程讲义/02《大前端与AI实战》第二次课程：API设计与数据库实战.md)
 - [第 3 次课：认证与核心业务 API](docs/课程讲义/03《大前端与AI实战》第三次课程：认证与核心业务API.md)
@@ -81,6 +86,7 @@ npm start
 - [后端工程说明](docs/技术文档/backend-README.md)
 - [讲义勘误说明](docs/技术文档/backend-errata.md)
 - [项目变更记录](docs/变更记录/2026-09-11-后端工程从零搭建与讲义勘误.md)
+- [接通腾讯云文档数据库](docs/变更记录/2026-10-09-接通腾讯云文档数据库.md)
 
 ## Git 约定
 

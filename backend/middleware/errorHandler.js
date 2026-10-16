@@ -11,11 +11,10 @@ function notFound(req, res, next) {
 function errorHandler(err, req, res, next) {
   const message = err.message || '服务器内部错误';
 
-  // 数据库未连接时，返回可读提示，而不是晦涩的 Mongoose 原生报错
+  // 不把 CloudBase SDK 的底层请求对象或凭据细节返回给调用方。
   const isDbError =
-    err.name === 'MongooseError' ||
-    err.name === 'MongoNotConnectedError' ||
-    /buffering timed out|must be connected|not connected/i.test(message);
+    err.name === 'CloudBaseConfigurationError' ||
+    err.name === 'CloudBaseDatabaseError';
 
   if (isDbError) {
     return res
@@ -24,8 +23,8 @@ function errorHandler(err, req, res, next) {
         createResponse(
           false,
           null,
-          '数据库未连接，请检查 .env 中的 MONGO_URI 是否正确',
-          err.message
+          'CloudBase 数据库暂不可用，请检查环境 ID、服务端 API Key 和数据库集合配置',
+          err.code || err.requestId || 'CLOUDBASE_UNAVAILABLE'
         )
       );
   }
@@ -34,7 +33,7 @@ function errorHandler(err, req, res, next) {
 
   // 开发环境打印堆栈，便于定位问题
   if (process.env.NODE_ENV !== 'production') {
-    console.error('[错误]', err);
+    console.error('[错误]', err.name, err.message);
   }
 
   res.status(status).json(createResponse(false, null, message, err.message || null));

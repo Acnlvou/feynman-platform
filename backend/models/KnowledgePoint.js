@@ -1,38 +1,78 @@
-// 知识点模型（对应讲义第 3 课）
-// 讲义注释里写了 status 的三个枚举值，但代码没加 enum 约束，这里补上（见 errata.md）
+const { runDatabaseRequest } = require('../config/cloudbase');
 
-const mongoose = require('mongoose');
+const COLLECTION = 'knowledge_points';
 
-const knowledgePointSchema = new mongoose.Schema(
-  {
-    // 所属用户，用于实现「只能操作自己的知识点」
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    title: {
-      type: String,
-      required: [true, '标题不能为空'],
-      trim: true,
-    },
-    content: {
-      type: String,
-      required: [true, '内容不能为空'],
-    },
-    // 掌握状态：未开始 / 学习中 / 已掌握
-    status: {
-      type: String,
-      enum: ['not_started', 'in_progress', 'mastered'],
-      default: 'not_started',
-    },
-    // 是否加入复习计划
-    reviewList: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  { timestamps: true }
-);
+function documentsFrom(result) {
+  if (Array.isArray(result.data)) return result.data;
+  return result.data ? [result.data] : [];
+}
 
-module.exports = mongoose.model('KnowledgePoint', knowledgePointSchema);
+async function readDocument(db, id) {
+  try {
+    const result = await db.collection(COLLECTION).doc(id).get();
+    return documentsFrom(result)[0] || null;
+  } catch (error) {
+    if (error.code === 'DOCUMENT_NOT_FOUND') return null;
+    throw error;
+  }
+}
+
+async function create({ user, title, content, status = 'not_started', reviewList = false }) {
+  return runDatabaseRequest(async (db) => {
+    const now = new Date();
+    const knowledgePoint = {
+      user,
+      title,
+      content,
+      status,
+      reviewList,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const result = await db.collection(COLLECTION).add(knowledgePoint);
+    return { ...knowledgePoint, _id: result.id };
+  });
+}
+
+async function findById(id) {
+  return runDatabaseRequest((db) => readDocument(db, id));
+}
+
+async function findByUser(userId) {
+  return runDatabaseRequest(async (db) => {
+    const documents = [];
+    const pageSize = 100;
+    while (true) {
+      const result = await db
+        .collection(COLLECTION)
+        .where({ user: userId })
+        .orderBy('createdAt', 'desc')
+        .orderBy('_id', 'asc')
+        .skip(documents.length)
+        .limit(pageSize)
+        .get();
+      const page = documentsFrom(result);
+      documents.push(...page);
+      if (page.length < pageSize) return documents;
+    }
+  });
+}
+
+async function updateById(id, fields) {
+  return runDatabaseRequest(async (db) => {
+    const result = await db
+      .collection(COLLECTION)
+      .doc(id)
+      .update({ ...fields, updatedAt: new Date() });
+
+    if (result.updated === 0) return null;
+
+    return readDocument(db, id);
+  });
+}
+
+async function deleteById(id) {
+  return runDatabaseRequest((db) => db.collection(COLLECTION).doc(id).remove());
+}
+
+module.exports = { create, deleteById, findById, findByUser, updateById };
