@@ -1,0 +1,61 @@
+《大前端与AI实战》本次课程自测内容与结果
+
+一、本次完成内容
+
+1. 完成登录页面前端：
+   - 使用 React 编写 LoginPage.jsx；
+   - 提供邮箱、密码输入框和登录按钮；
+   - 提交时显示“正在登录…”并禁用按钮，避免重复提交；
+   - 登录失败时显示后端错误信息；
+   - 登录成功后跳转到学习空间；
+   - 提供注册入口。
+
+2. 完成前后端联调：
+   - 使用 Axios 封装 API 客户端；
+   - 登录页面调用 POST /api/users/login；
+   - AuthContext 统一处理登录、注册、Token 保存和退出；
+   - 使用 localStorage 保存 feynman_token，刷新页面后恢复登录状态；
+   - Axios 请求拦截器自动携带 x-auth-token；
+   - ProtectedRoute 保护学习空间，未登录时跳转到 /login。
+
+二、自测题目与答案
+
+1. 登录页面提交时，前端做了哪些事情？
+答：阻止表单默认提交，清空旧错误，设置 submitting 状态，然后调用 AuthContext 的 login 方法；请求完成后恢复按钮状态。失败时显示错误，成功时跳转到学习空间。
+
+2. 登录请求具体调用了哪个接口？
+答：前端通过 apiClient.post('/users/login', credentials) 调用后端接口，结合 baseURL 后完整地址是 POST /api/users/login。
+
+3. 登录成功后 Token 保存在哪里？
+答：后端返回 response.data.data.token，AuthContext 将它保存到 localStorage 的 feynman_token，同时更新 React 状态。
+
+4. 为什么要使用 React Context 管理登录状态？
+答：登录状态会被多个页面和组件使用。使用 Context 后，LoginPage、路由守卫、导航栏和业务页面可以共享 token、user、login、logout，不需要层层传递 Props。
+
+5. Axios 请求拦截器的作用是什么？
+答：每次发送请求前从 localStorage 读取 feynman_token；如果存在，就自动添加 x-auth-token 请求头，使后端能够识别当前登录用户。
+
+6. ProtectedRoute 如何保护页面？
+答：它从 AuthContext 获取 isAuthenticated。如果没有 Token，就使用 Navigate 跳转到 /login；有 Token 时通过 Outlet 渲染受保护的学习空间页面。
+
+7. 如果登录请求失败，页面会如何处理？
+答：catch 捕获请求错误，通过 getApiErrorMessage 读取后端 message、error 或网络错误，并在表单上显示提示；finally 中恢复提交按钮状态。
+
+三、自测结果
+
+1. 前端构建：通过。执行 npm run build 成功，Vite 生产构建完成。
+2. 前端页面：通过。已确认登录路由 /login、登录表单、邮箱和密码输入、提交中状态、错误提示、注册入口和成功跳转逻辑均已实现。
+3. API 请求链路：已接通。前端默认请求 http://localhost:3000/api，登录调用 /users/login；变更记录确认请求可以到达后端。
+4. 登录状态管理：通过代码检查。AuthContext 使用 localStorage 保存 feynman_token，client.js 自动发送 x-auth-token，ProtectedRoute 负责未登录跳转。
+5. 当前限制：测试环境没有提供可用的 MONGO_URI，因此真实注册、真实登录、JWT 持久化和登录后完整业务流程尚未完成数据库联调，不能夸大为真实登录已经成功。
+
+四、本次课程结论
+
+本次主要完成了“登录页面前端”和“前后端联调骨架”：页面可以采集登录信息，Axios 可以发起 API 请求，Context 可以保存 JWT，路由守卫可以保护学习空间，前端工程也能正常构建。下一步接入可用 MongoDB 后，再完成真实注册→登录→登录后访问的全链路验收。
+
+五、下一步计划
+
+- 配置可用的 MongoDB 连接并完成真实登录验收；
+- 验证登录成功后刷新页面仍保持登录；
+- 验证退出登录后访问学习空间会跳转到登录页；
+- 继续完善登录后的知识点编辑和富文本渲染功能。

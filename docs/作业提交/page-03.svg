@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#0B1F3A"/>
+  <text x="56" y="60" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="32" font-weight="700" fill="#FFFFFF">登录页：从表单到反馈，交互是完整的</text>
+  <text x="56" y="92" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="16" fill="#A9BED1">不是静态 Demo：提交时会请求 API，失败会给出提示，成功会继续跳转。</text>
+  <rect x="56" y="132" width="430" height="310" rx="22" fill="#12365A" stroke="#2B587A"/>
+  <rect x="86" y="160" width="370" height="254" rx="16" fill="#F6F8FC"/>
+  <text x="118" y="199" font-family="Arial,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#1BA6A6">WELCOME BACK</text><text x="118" y="234" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="25" font-weight="700" fill="#0B1F3A">继续你的学习旅程</text><text x="118" y="259" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="12" fill="#71869A">把今天学到的内容讲出来。</text>
+  <rect x="118" y="282" width="306" height="38" rx="8" fill="#FFFFFF" stroke="#DCE5EF"/><text x="132" y="306" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="12" fill="#9AA9A8">邮箱 · you@example.com</text>
+  <rect x="118" y="330" width="306" height="38" rx="8" fill="#FFFFFF" stroke="#DCE5EF"/><text x="132" y="354" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="12" fill="#9AA9A8">密码 · 输入登录密码</text>
+  <rect x="118" y="378" width="306" height="28" rx="14" fill="#0F766E"/><text x="271" y="397" text-anchor="middle" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="12" font-weight="700" fill="#FFFFFF">登录平台</text>
+  <text x="544" y="168" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="20" font-weight="700" fill="#7FD7D2">页面交互</text>
+  <g font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="16"><circle cx="558" cy="215" r="11" fill="#1BA6A6"/><text x="554" y="220" font-size="13" fill="#0B1F3A">1</text><text x="584" y="220" fill="#FFFFFF">输入邮箱和密码</text><circle cx="558" cy="267" r="11" fill="#1BA6A6"/><text x="554" y="272" font-size="13" fill="#0B1F3A">2</text><text x="584" y="272" fill="#FFFFFF">提交中：按钮禁用</text><circle cx="558" cy="319" r="11" fill="#FFB454"/><text x="554" y="324" font-size="13" fill="#0B1F3A">3</text><text x="584" y="324" fill="#FFFFFF">失败：显示 API 错误</text><circle cx="558" cy="371" r="11" fill="#1BA6A6"/><text x="554" y="376" font-size="13" fill="#0B1F3A">4</text><text x="584" y="376" fill="#FFFFFF">成功：跳转学习空间</text></g>
+  <text x="56" y="482" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="14" fill="#A9BED1">对应实现：form submit · submitting · getApiErrorMessage · navigate</text><text x="904" y="516" text-anchor="end" font-family="Arial,sans-serif" font-size="14" fill="#91A7BD">03 / 07</text>
+</svg>
