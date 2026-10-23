@@ -116,11 +116,22 @@ async function updateById(point, fields) {
   });
 }
 
+// 先标记删除意图，再清理关联复述；其他进程的保存也能看到该状态。
+async function markDeleting(point) {
+  return runDatabaseRequest((db) =>
+    db
+      .collection(COLLECTION)
+      .where({ _id: point._id, user: point.user })
+      .update({ deleting: true }),
+  );
+}
+
 async function deleteById(id) {
   return runDatabaseRequest((db) => db.collection(COLLECTION).doc(id).remove());
 }
 
 module.exports = {
+  markDeleting,
   snapshot,
   create,
   deleteById,

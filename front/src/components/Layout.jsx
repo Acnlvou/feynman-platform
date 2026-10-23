@@ -13,8 +13,14 @@ export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const isEditor = /^\/knowledge\/(new|[^/]+\/edit)\/?$/.test(location.pathname)
-  const isDetail = /^\/knowledge\/[^/]+\/?$/.test(location.pathname) && !isEditor
-  const isCompact = isEditor || isDetail || ['/knowledge', '/overview'].includes(location.pathname)
+  const isRecord = /^\/knowledge\/[^/]+\/record\/?$/.test(location.pathname)
+  const isDetail =
+    /^\/knowledge\/[^/]+\/?$/.test(location.pathname) && !isEditor
+  const isCompact =
+    isEditor ||
+    isDetail ||
+    isRecord ||
+    ['/knowledge', '/overview'].includes(location.pathname)
   const [open, setOpen] = useState(false)
   const menu = useRef(null)
   const trigger = useRef(null)
@@ -40,7 +46,9 @@ export default function Layout() {
     }
   }, [open])
   return (
-    <div className={`app-shell${isEditor ? ' app-shell--editor' : ''}${isCompact ? ' app-shell--compact' : ''}${isDetail ? ' app-shell--reader' : ''}`}>
+    <div
+      className={`app-shell${isEditor ? ' app-shell--editor' : ''}${isCompact ? ' app-shell--compact' : ''}${isDetail ? ' app-shell--reader' : ''}${isRecord ? ' app-shell--record' : ''}`}
+    >
       <a className="skip-link" href="#main">
         跳到正文
       </a>
@@ -94,6 +102,10 @@ export default function Layout() {
                         !window.confirm('退出将离开当前编辑页面，确定退出吗？')
                       )
                         return
+                    }
+                    if (isRecord) {
+                      navigate('/logout')
+                      return
                     }
                     logout()
                     navigate('/login')

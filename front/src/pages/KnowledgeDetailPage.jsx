@@ -87,6 +87,12 @@ export default function KnowledgeDetailPage() {
           </Link>
           <h1 title={point.title}>{point.title}</h1>
           <div className="detail-actions">
+            <Link
+              className="button button-small"
+              to={`/knowledge/${point._id}/record`}
+            >
+              录音复述
+            </Link>
             <button className="button" onClick={() => setHistoryOpen(true)}>
               历史
             </button>

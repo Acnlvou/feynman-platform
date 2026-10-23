@@ -1,6 +1,8 @@
 const express = require('express');
 const KnowledgePoint = require('../models/KnowledgePoint');
 const service = require('../services/knowledgePoints');
+const attempts = require('../services/feynmanAttempts');
+const Attempt = require('../models/FeynmanAttempt');
 const auth = require('../middleware/auth');
 const { createResponse } = require('../utils/response');
 const router = express.Router();
@@ -58,6 +60,23 @@ router.get(
   ),
 );
 router.get(
+  '/:id/attempts',
+  endpoint(async (req, res) =>
+    respond(res, await attempts.recent(req.user.id, req.params.id), '最近复述'),
+  ),
+);
+router.post(
+  '/:id/attempts',
+  endpoint(async (req, res) =>
+    respond(
+      res,
+      await attempts.save(req.user.id, req.params.id, req.body),
+      '复述已保存',
+      201,
+    ),
+  ),
+);
+router.get(
   '/:id/history',
   endpoint(async (req, res) =>
     respond(
@@ -104,7 +123,11 @@ router.put(
 router.delete(
   '/:id',
   endpoint(async (req, res) => {
-    const point = await service.owned(req.params.id, req.user.id);
+    const point = await service.owned(req.params.id, req.user.id, {
+      allowDeleting: true,
+    });
+    await KnowledgePoint.markDeleting(point);
+    await Attempt.removeForPoint(req.user.id, point._id);
     await KnowledgePoint.deleteById(point._id);
     respond(res, null, '知识点删除成功');
   }),

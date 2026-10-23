@@ -4,7 +4,10 @@ const { createResponse } = require('../utils/response');
 
 // 404：没有任何路由匹配时触发，交给下面的 errorHandler 统一输出
 function notFound(req, res, next) {
-  next({ status: 404, message: `接口不存在：${req.method} ${req.originalUrl}` });
+  next({
+    status: 404,
+    message: `接口不存在：${req.method} ${req.originalUrl}`,
+  });
 }
 
 // 统一异常出口，必须挂在所有路由之后
@@ -23,9 +26,11 @@ function errorHandler(err, req, res, next) {
         createResponse(
           false,
           null,
-          'CloudBase 数据库暂不可用，请检查环境 ID、服务端 API Key 和数据库集合配置',
-          err.code || err.requestId || 'CLOUDBASE_UNAVAILABLE'
-        )
+          err.collectionName === 'feynman_attempts'
+            ? '复述数据库暂不可用，请确认 feynman_attempts 集合已创建并检查后端数据库配置'
+            : 'CloudBase 数据库暂不可用，请检查环境 ID、服务端 API Key 和数据库集合配置',
+          err.code || err.requestId || 'CLOUDBASE_UNAVAILABLE',
+        ),
       );
   }
 
@@ -36,7 +41,9 @@ function errorHandler(err, req, res, next) {
     console.error('[错误]', err.name, err.message);
   }
 
-  res.status(status).json(createResponse(false, null, message, err.message || null));
+  res
+    .status(status)
+    .json(createResponse(false, null, message, err.message || null));
 }
 
 module.exports = errorHandler;

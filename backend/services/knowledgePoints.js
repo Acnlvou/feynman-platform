@@ -54,7 +54,7 @@ function validate(input, partial = false) {
 }
 function publicPoint(point) {
   if (!point) return null;
-  const { history, ...data } = point;
+  const { history, deleting, ...data } = point;
   return {
     ...data,
     category: data.category || '',
@@ -67,12 +67,14 @@ function exportFields(point) {
     FIELDS.map((field) => [field, publicPoint(point)[field]]),
   );
 }
-async function owned(id, user) {
+async function owned(id, user, { allowDeleting = false } = {}) {
   if (typeof id !== 'string' || !id || id.length > 128)
     throw failure('知识点编号不正确');
   const point = await KnowledgePoint.findById(id);
   if (!point) throw failure('知识点不存在', 404);
   if (point.user !== user) throw failure('无权操作他人的知识点', 403);
+  if (point.deleting && !allowDeleting)
+    throw failure('该知识点正在删除，请在知识库完成删除后重试', 409);
   return point;
 }
 async function create(user, input) {

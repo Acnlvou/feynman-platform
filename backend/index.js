@@ -26,6 +26,7 @@ app.get('/', (req, res) => {
 
 // ---------------- 第 3 课：业务路由 ----------------
 app.use('/api/users', require('./routes/users'));
+app.use('/api/audio', require('./routes/audio'));
 app.use('/api/knowledge-points', require('./routes/knowledgePoints'));
 
 // ---------------- 统一错误处理 ----------------
