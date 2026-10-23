@@ -17,7 +17,7 @@ const app = express();
 
 // ---------------- 全局中间件 ----------------
 app.use(cors()); // 允许前端跨域访问（讲义第 2 课提到但漏装，见 errata.md 第 3 条）
-app.use(express.json()); // 解析 JSON 请求体，否则 req.body 为 undefined
+app.use(express.json({ limit: '1mb' })); // 解析 JSON 请求体，否则 req.body 为 undefined
 
 // ---------------- 第 1 课：Hello World ----------------
 app.get('/', (req, res) => {

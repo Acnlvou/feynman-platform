@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import AuthPageShell from '../components/AuthPageShell'
 
 export default function LoginPage() {
   const { isAuthenticated, login } = useAuth()
@@ -11,7 +12,11 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  if (isAuthenticated) return <Navigate to="/" replace />
+  const from = location.state?.from
+  const destination = from
+    ? `${from.pathname}${from.search || ''}${from.hash || ''}`
+    : '/knowledge'
+  if (isAuthenticated) return <Navigate to={destination} replace />
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -19,7 +24,7 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       await login(form)
-      navigate(location.state?.from?.pathname || '/', { replace: true })
+      navigate(destination, { replace: true })
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, '登录失败，请检查邮箱和密码'))
     } finally {
@@ -29,23 +34,31 @@ export default function LoginPage() {
 
   return (
     <AuthPageShell
-      eyebrow="WELCOME BACK"
-      title="继续你的学习旅程"
-      description="把今天学到的内容讲出来，让理解留下清晰的痕迹。"
+      title="登录学习空间"
+      description="欢迎回来，继续整理你的知识。"
       footer={
         <>
-          还没有账号？ <Link to="/register">创建一个账号</Link>
+          还没有账号？{' '}
+          <Link to="/register" state={location.state}>
+            创建一个账号
+          </Link>
         </>
       }
     >
       <form className="auth-form" onSubmit={handleSubmit}>
-        {error && <p className="form-alert">{error}</p>}
+        {error && (
+          <p className="form-alert" role="alert">
+            {error}
+          </p>
+        )}
         <label>
           邮箱
           <input
             type="email"
             value={form.email}
-            onChange={(event) => setForm({ ...form, email: event.target.value })}
+            onChange={(event) =>
+              setForm({ ...form, email: event.target.value })
+            }
             placeholder="you@example.com"
             autoComplete="email"
             required
@@ -56,46 +69,21 @@ export default function LoginPage() {
           <input
             type="password"
             value={form.password}
-            onChange={(event) => setForm({ ...form, password: event.target.value })}
+            onChange={(event) =>
+              setForm({ ...form, password: event.target.value })
+            }
             placeholder="输入登录密码"
             autoComplete="current-password"
             required
           />
         </label>
-        <button className="button button-primary button-wide" disabled={submitting}>
+        <button
+          className="button button-primary button-wide"
+          disabled={submitting}
+        >
           {submitting ? '正在登录…' : '登录平台'}
         </button>
       </form>
     </AuthPageShell>
-  )
-}
-
-function AuthPageShell({ eyebrow, title, description, children, footer }) {
-  return (
-    <div className="auth-page">
-      <div className="auth-aside">
-        <Link className="brand brand-light" to="/login">
-          <span className="brand-mark">F</span>
-          <span>
-            <strong>费曼学习平台</strong>
-            <small>Feynman Learning Platform</small>
-          </span>
-        </Link>
-        <div className="quote-block">
-          <span className="quote-mark">“</span>
-          <p>如果你不能用简单的语言解释它，说明你还没有真正理解它。</p>
-          <span className="quote-source">— Richard Feynman</span>
-        </div>
-      </div>
-      <div className="auth-panel">
-        <div className="auth-card">
-          <span className="eyebrow">{eyebrow}</span>
-          <h1>{title}</h1>
-          <p className="auth-description">{description}</p>
-          {children}
-          <p className="auth-footer">{footer}</p>
-        </div>
-      </div>
-    </div>
   )
 }

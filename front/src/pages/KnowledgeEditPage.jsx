@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import apiClient, { getApiErrorMessage } from '../api/client'
 import KnowledgePointForm from '../components/KnowledgePointForm'
+import PageState from '../components/PageState'
+import Icon from '../components/Icon'
 
 function describeError(requestError) {
   const status = requestError?.response?.status
@@ -29,6 +31,9 @@ export default function KnowledgeEditPage() {
         content: point.content || '',
         status: point.status || 'not_started',
         reviewList: Boolean(point.reviewList),
+        category: point.category || '',
+        tags: point.tags || [],
+        revision: point.revision || 1,
       })
     } catch (requestError) {
       setInitialValue(null)
@@ -47,50 +52,37 @@ export default function KnowledgeEditPage() {
     setError('')
     try {
       await apiClient.put(`/knowledge-points/${id}`, values)
-      navigate(`/knowledge/${id}`, { replace: true, state: { message: '知识点已更新' } })
+      navigate(`/knowledge/${id}`, {
+        replace: true,
+        state: { message: '知识点已更新' },
+      })
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, '保存失败，请稍后重试'))
       setSubmitting(false)
     }
   }
 
-  if (loading) {
+  if (loading) return <PageState loading />
+  if (!initialValue)
     return (
-      <section className="knowledge-page">
-        <div className="empty-state">
-          <span className="loader" />
-          正在加载知识点…
-        </div>
-      </section>
+      <PageState title="无法编辑这个知识点" message={error} retry={loadPoint}>
+        <Link className="button" to="/knowledge">
+          返回知识库
+        </Link>
+      </PageState>
     )
-  }
-
-  if (!initialValue) {
-    return (
-      <section className="knowledge-page">
-        <div className="empty-state">
-          <span className="empty-icon">◇</span>
-          <h3>无法编辑这个知识点</h3>
-          <p>{error}</p>
-          <Link className="button button-primary button-small" to="/knowledge">
-            返回知识点列表
-          </Link>
-        </div>
-      </section>
-    )
-  }
 
   return (
-    <section className="knowledge-page edit-page">
+    <section className="knowledge-page edit-page editor-page">
       <div className="page-header">
         <div>
-          <span className="eyebrow">EDIT KNOWLEDGE</span>
+          <Link className="back-link" to={`/knowledge/${id}`}>
+            <Icon name="arrow" size={18} />
+            返回详情
+          </Link>
           <h1>编辑知识点</h1>
-          <p>改完之后切到「预览」，确认公式与图表显示正常再保存。</p>
+          <p>完善你的解释，让理解更进一步。</p>
         </div>
-        <Link className="button button-ghost button-small" to={`/knowledge/${id}`}>
-          返回详情
-        </Link>
       </div>
 
       <div className="edit-panel">

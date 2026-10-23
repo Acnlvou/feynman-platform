@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:ui": "node scripts/verify-ui.cjs",
+    "test:transfer": "node --test scripts/lesson6-transfer.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

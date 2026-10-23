@@ -1,50 +1,101 @@
 import { Link } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
-
+import Icon from '../components/Icon'
+import StatusBadge from '../components/StatusBadge'
+import PageState from '../components/PageState'
+import useKnowledgePoints from '../hooks/useKnowledgePoints'
+import { formatDate } from '../utils/knowledge'
 export default function DashboardPage() {
-  const { user } = useAuth()
-
+  const { points, loading, error, reload } = useKnowledgePoints()
+  const stats = [
+    { title: '全部知识点', value: points.length, icon: 'book' },
+    {
+      title: '正在学习',
+      value: points.filter((p) => p.status === 'in_progress').length,
+      icon: 'edit',
+    },
+    {
+      title: '已经掌握',
+      value: points.filter((p) => p.status === 'mastered').length,
+      icon: 'check',
+    },
+  ]
+  const recent = [...points]
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt || b.createdAt) -
+        new Date(a.updatedAt || a.createdAt),
+    )
+    .slice(0, 5)
   return (
-    <section className="dashboard-page">
-      <div className="hero-card">
+    <section className="overview-page compact-page">
+      <div className="page-header">
         <div>
-          <span className="eyebrow">YOUR LEARNING SPACE</span>
-          <h1>你好，{user?.username || '学习者'}。</h1>
-          <p>今天也用自己的话，讲清楚一个知识点吧。</p>
-          <Link className="button button-light" to="/knowledge">
-            进入知识库 <span>↗</span>
-          </Link>
+          <h1>学习概览</h1>
         </div>
-        <div className="hero-orbit" aria-hidden="true">
-          <span className="orbit-dot dot-one" />
-          <span className="orbit-dot dot-two" />
-          <span className="orbit-dot dot-three" />
-          <div className="orbit-core">F</div>
+        <Link className="button button-primary" to="/knowledge/new">
+          <Icon name="plus" />
+          新建知识点
+        </Link>
+      </div>
+      {loading ? (
+        <PageState loading />
+      ) : error ? (
+        <div className="surface">
+          <PageState
+            title="暂时无法加载学习概览"
+            message={error}
+            retry={reload}
+          />
         </div>
-      </div>
-
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">A SIMPLE LOOP</span>
-          <h2>从记住，到真正理解</h2>
-        </div>
-        <span className="muted-label">费曼学习法</span>
-      </div>
-      <div className="method-grid">
-        <MethodCard number="01" title="记录" text="把新知识放进自己的知识库。" icon="＋" />
-        <MethodCard number="02" title="复述" text="不用术语，尝试讲给另一个人听。" icon="↗" />
-        <MethodCard number="03" title="发现" text="标记含糊的地方，回到知识源头。" icon="◌" />
-      </div>
+      ) : (
+        <>
+          <div className="stats-grid">
+            {stats.map((stat) => (
+              <div className="stat-card" key={stat.title}>
+                <span className="stat-label">
+                  {stat.title}
+                  <Icon name={stat.icon} />
+                </span>
+                <strong>
+                  {stat.value}
+                  <small>个</small>
+                </strong>
+              </div>
+            ))}
+          </div>
+          <div className="surface">
+            <div className="section-heading">
+              <h2>最近更新</h2>
+              <Link className="text-link" to="/knowledge">
+                查看全部 →
+              </Link>
+            </div>
+            {!recent.length ? (
+              <PageState
+                title="还没有学习记录"
+                message="创建一个知识点，开始积累你的知识库。"
+              >
+                <Link className="button" to="/knowledge/new">
+                  创建知识点
+                </Link>
+              </PageState>
+            ) : (
+              recent.map((point) => (
+                <Link
+                  className="recent-row"
+                  key={point._id}
+                  to={`/knowledge/${point._id}`}
+                >
+                  <Icon name="book" />
+                  <span>{point.title}</span>
+                  <StatusBadge status={point.status} />
+                  <time>{formatDate(point.updatedAt || point.createdAt)}</time>
+                </Link>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </section>
-  )
-}
-
-function MethodCard({ number, title, text, icon }) {
-  return (
-    <article className="method-card">
-      <div className="method-card-top"><span>{number}</span><span className="method-icon">{icon}</span></div>
-      <h3>{title}</h3>
-      <p>{text}</p>
-    </article>
   )
 }

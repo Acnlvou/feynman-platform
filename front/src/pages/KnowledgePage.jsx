@@ -1,183 +1,286 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import apiClient, { getApiErrorMessage } from '../api/client'
-import KnowledgePointForm from '../components/KnowledgePointForm'
 import StatusBadge from '../components/StatusBadge'
-
-function summarize(content = '') {
-  const text = content
-    .replace(/```[\s\S]*?```/g, ' [ 图表 / 代码 ] ')
-    .replace(/[#$>*_`~|]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  return text.length > 110 ? `${text.slice(0, 110)}…` : text
-}
-
+import Icon from '../components/Icon'
+import PageState from '../components/PageState'
+import useKnowledgePoints from '../hooks/useKnowledgePoints'
+import { summarize, formatDate } from '../utils/knowledge'
+import KnowledgeImport from '../components/KnowledgeImport'
+import { downloadFile } from '../utils/knowledgeTransfer'
 export default function KnowledgePage() {
-  const [knowledgePoints, setKnowledgePoints] = useState([])
+  const { points, setPoints, loading, error, reload } = useKnowledgePoints()
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [listError, setListError] = useState('')
-  const [listMessage, setListMessage] = useState('')
-  const [formError, setFormError] = useState('')
-  const [formMessage, setFormMessage] = useState('')
-  const [formKey, setFormKey] = useState(0)
+  const [status, setStatus] = useState('all')
+  const [category, setCategory] = useState('all')
+  const [tag, setTag] = useState('all')
+  const [importOpen, setImportOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const categories = [
+    ...new Set(points.map((point) => point.category).filter(Boolean)),
+  ]
+  const tags = [...new Set(points.flatMap((point) => point.tags || []))]
+  const exportAll = async () => {
+    setExporting(true)
+    setActionError('')
+    try {
+      const response = await apiClient.get('/knowledge-points/export')
+      downloadFile(
+        '费曼知识库备份.json',
+        JSON.stringify(response.data.data, null, 2),
+      )
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, '导出失败'))
+    } finally {
+      setExporting(false)
+    }
+  }
+  const [actionError, setActionError] = useState('')
   const location = useLocation()
-
-  const loadKnowledgePoints = useCallback(async () => {
-    setLoading(true)
-    setListError('')
+  const [message, setMessage] = useState(location.state?.message || '')
+  const [deleting, setDeleting] = useState(null)
+  const filtered = useMemo(
+    () =>
+      points.filter(
+        (point) =>
+          (status === 'all' || point.status === status) &&
+          (category === 'all' ||
+            (category === 'uncategorized'
+              ? !point.category
+              : point.category === category.slice(6))) &&
+          (tag === 'all' || (point.tags || []).includes(tag.slice(6))) &&
+          `${point.title} ${point.content} ${point.category || ''} ${(point.tags || []).join(' ')}`
+            .toLowerCase()
+            .includes(search.trim().toLowerCase()),
+      ),
+    [points, status, category, tag, search],
+  )
+  const remove = async (point) => {
+    if (!window.confirm(`确定删除「${point.title}」吗？删除后无法恢复。`))
+      return
+    setDeleting(point._id)
+    setActionError('')
+    setMessage('')
     try {
-      const response = await apiClient.get('/knowledge-points')
-      setKnowledgePoints(response.data.data || [])
-    } catch (requestError) {
-      setListError(getApiErrorMessage(requestError, '知识点加载失败'))
+      await apiClient.delete(`/knowledge-points/${point._id}`)
+      setPoints((current) => current.filter((item) => item._id !== point._id))
+      setMessage('知识点已删除')
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, '删除失败，请稍后重试'))
     } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadKnowledgePoints()
-  }, [loadKnowledgePoints])
-
-  useEffect(() => {
-    if (location.state?.message) setListMessage(location.state.message)
-  }, [location.state])
-
-  const filteredPoints = useMemo(() => {
-    const keyword = search.trim().toLowerCase()
-    if (!keyword) return knowledgePoints
-    return knowledgePoints.filter((point) => `${point.title} ${point.content}`.toLowerCase().includes(keyword))
-  }, [knowledgePoints, search])
-
-  const handleCreate = async (values) => {
-    setSubmitting(true)
-    setFormError('')
-    setFormMessage('')
-    try {
-      const response = await apiClient.post('/knowledge-points', values)
-      setKnowledgePoints((current) => [response.data.data, ...current])
-      setFormKey((current) => current + 1)
-      setFormMessage('知识点已加入你的学习空间')
-    } catch (requestError) {
-      setFormError(getApiErrorMessage(requestError, '创建知识点失败'))
-    } finally {
-      setSubmitting(false)
+      setDeleting(null)
     }
   }
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('确定要删除这个知识点吗？删除后无法恢复。')) return
-    setListError('')
-    setListMessage('')
-    try {
-      await apiClient.delete(`/knowledge-points/${id}`)
-      setKnowledgePoints((current) => current.filter((point) => point._id !== id))
-      setListMessage('知识点已删除')
-    } catch (requestError) {
-      setListError(getApiErrorMessage(requestError, '删除失败，请稍后重试'))
-    }
-  }
-
   return (
-    <section className="knowledge-page">
+    <section className="knowledge-page compact-page">
       <div className="page-header">
         <div>
-          <span className="eyebrow">MY KNOWLEDGE BASE</span>
-          <h1>我的知识点</h1>
-          <p>把零散的输入，整理成可以复述的理解。</p>
+          <h1>
+            知识库{' '}
+            <span className="count">
+              {!loading && !error ? points.length : '—'}
+            </span>
+          </h1>
         </div>
-        <Link className="button button-primary" to="/">
-          返回概览 <span>↗</span>
-        </Link>
+        <div className="library-actions">
+          <button className="button" onClick={() => setImportOpen(true)}>
+            导入
+          </button>
+          <button
+            className="button"
+            disabled={exporting || loading || !!error}
+            onClick={exportAll}
+          >
+            {exporting ? '导出中…' : '导出备份'}
+          </button>
+          <Link className="button button-primary" to="/knowledge/new">
+            <Icon name="plus" />
+            新建知识点
+          </Link>
+        </div>
       </div>
-
-      <div className="knowledge-layout">
-        <div className="knowledge-list-panel">
-          <div className="list-toolbar">
-            <div>
-              <strong>{knowledgePoints.length}</strong>
-              <span> 个知识点</span>
-            </div>
+      <div className="library-panel">
+        <div className="list-toolbar">
+          <label className="search-box">
+            <Icon name="search" />
             <input
-              className="search-input"
+              aria-label="搜索知识点"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="搜索知识点…"
-              aria-label="搜索知识点"
+              placeholder="搜索标题或正文…"
             />
-          </div>
-
-          {listError && (
-            <p className="form-alert" role="alert">
-              {listError}
-            </p>
-          )}
-          {listMessage && <p className="form-success">{listMessage}</p>}
-          {loading ? (
-            <div className="empty-state">
-              <span className="loader" />
-              正在加载知识点…
+          </label>
+          <label className="filter-label">
+            <span>状态</span>
+            <select
+              aria-label="筛选状态"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+            >
+              <option value="all">全部状态</option>
+              <option value="not_started">未开始</option>
+              <option value="in_progress">学习中</option>
+              <option value="mastered">已掌握</option>
+            </select>
+          </label>
+        </div>
+        <div className="classification-filters">
+          <label>
+            分类
+            <select
+              aria-label="筛选分类"
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+            >
+              <option value="all">全部分类</option>
+              <option value="uncategorized">未分类</option>
+              {categories.map((value) => (
+                <option key={value} value={'value:' + value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            标签
+            <select
+              aria-label="筛选标签"
+              value={tag}
+              onChange={(event) => setTag(event.target.value)}
+            >
+              <option value="all">全部标签</option>
+              {tags.map((value) => (
+                <option key={value} value={'value:' + value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {message && (
+          <p className="form-success" role="status">
+            {message}
+          </p>
+        )}
+        {actionError && (
+          <p className="form-alert" role="alert">
+            {actionError}
+          </p>
+        )}
+        {loading ? (
+          <PageState loading />
+        ) : error ? (
+          <PageState
+            title="暂时无法加载知识库"
+            message={error}
+            retry={reload}
+          />
+        ) : !filtered.length ? (
+          <PageState
+            title={
+              points.length ? '没有找到匹配的知识点' : '从第一个知识点开始'
+            }
+            message={
+              points.length
+                ? '试试其他关键词，或调整状态筛选。'
+                : '记下一个概念，再用自己的话解释它。'
+            }
+          >
+            {points.length ? (
+              <button
+                className="button"
+                onClick={() => {
+                  setSearch('')
+                  setStatus('all')
+                  setCategory('all')
+                  setTag('all')
+                }}
+              >
+                清除筛选
+              </button>
+            ) : (
+              <Link className="button button-primary" to="/knowledge/new">
+                <Icon name="plus" />
+                新建知识点
+              </Link>
+            )}
+          </PageState>
+        ) : (
+          <>
+            <div className="list-head">
+              <span>知识点</span>
+              <span>更新日期 / 操作</span>
             </div>
-          ) : filteredPoints.length === 0 ? (
-            <div className="empty-state">
-              <span className="empty-icon">◇</span>
-              <h3>{search ? '没有找到匹配内容' : '知识库还是空的'}</h3>
-              <p>{search ? '换一个关键词试试。' : '从右侧添加第一个知识点，开始你的费曼循环。'}</p>
-            </div>
-          ) : (
             <div className="knowledge-list">
-              {filteredPoints.map((point) => (
+              {filtered.map((point) => (
                 <article className="knowledge-item" key={point._id}>
+                  <span className="document-icon">
+                    <Icon name="book" />
+                  </span>
                   <div className="knowledge-item-main">
                     <div className="knowledge-item-heading">
-                      <h3>
-                        <Link to={`/knowledge/${point._id}`}>{point.title}</Link>
-                      </h3>
+                      <Link
+                        to={`/knowledge/${point._id}`}
+                        className="knowledge-title"
+                      >
+                        {point.title}
+                      </Link>
                       <StatusBadge status={point.status} />
-                      {point.reviewList && <span className="review-flag">待复习</span>}
+                      {point.reviewList && (
+                        <span className="review-flag">待复习</span>
+                      )}
                     </div>
+                    {(point.category || point.tags?.length > 0) && (
+                      <div className="knowledge-taxonomy">
+                        {point.category && (
+                          <span className="category-chip">
+                            {point.category}
+                          </span>
+                        )}
+                        {(point.tags || []).map((value) => (
+                          <span className="tag-chip" key={value}>
+                            #{value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <p>{summarize(point.content)}</p>
-                    <small>{new Date(point.createdAt).toLocaleDateString('zh-CN')}</small>
                   </div>
-                  <div className="knowledge-item-actions">
-                    <Link className="icon-button" to={`/knowledge/${point._id}/edit`} aria-label={`编辑${point.title}`}>
-                      ✎
-                    </Link>
-                    <button
-                      className="icon-button"
-                      onClick={() => handleDelete(point._id)}
-                      aria-label={`删除${point.title}`}
-                    >
-                      ×
-                    </button>
+                  <div className="knowledge-item-end">
+                    <time>
+                      {formatDate(point.updatedAt || point.createdAt)}
+                    </time>
+                    <div className="knowledge-item-actions">
+                      <Link
+                        className="icon-button"
+                        to={`/knowledge/${point._id}/edit`}
+                        aria-label={`编辑${point.title}`}
+                      >
+                        <Icon name="edit" size={18} />
+                      </Link>
+                      <button
+                        className="icon-button danger"
+                        disabled={deleting !== null}
+                        onClick={() => remove(point)}
+                        aria-label={`删除${point.title}`}
+                      >
+                        <Icon name="trash" size={18} />
+                      </button>
+                    </div>
                   </div>
                 </article>
               ))}
             </div>
-          )}
-        </div>
-
-        <aside className="create-panel">
-          <div className="panel-heading">
-            <span className="panel-number">01</span>
-            <div>
-              <span className="eyebrow">ADD A THOUGHT</span>
-              <h2>记录新知识</h2>
-            </div>
-          </div>
-          <KnowledgePointForm
-            key={formKey}
-            submitting={submitting}
-            error={formError}
-            success={formMessage}
-            submitLabel="保存知识点"
-            onSubmit={handleCreate}
-          />
-        </aside>
+            <div className="list-footer">显示 {filtered.length} 个知识点</div>
+          </>
+        )}
       </div>
+      {importOpen && (
+        <KnowledgeImport
+          onClose={() => setImportOpen(false)}
+          onImported={reload}
+        />
+      )}
     </section>
   )
 }

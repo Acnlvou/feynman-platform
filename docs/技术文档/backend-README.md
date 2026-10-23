@@ -150,3 +150,24 @@ curl http://localhost:3000/api/knowledge-points -H "x-auth-token: <TOKEN>"
 - [`backend-errata.md`](backend-errata.md) —— 讲义勘误说明（本工程相对讲义的 10 处修正）
 - [`../项目计划/`](../项目计划/) —— 项目规划文档
 - [`../项目计划/00 费曼学习平台·全项目执行计划.md`](../项目计划/00%20费曼学习平台·全项目执行计划.md) —— 全项目路线图
+
+## 第6课新增接口与数据（2026-10-23）
+
+知识点业务集中于 `backend/services/knowledgePoints.js`；CloudBase 访问仍集中在 models。所有新增接口继续使用 `x-auth-token`，只访问当前用户的数据。
+
+| 方法 | 路径（前缀 `/api/knowledge-points`） | 说明 |
+| --- | --- | --- |
+| GET | `/export` | 导出当前用户全部当前状态，返回 `format/version/exportedAt/knowledgePoints` |
+| POST | `/import` | 校验整个批次后逐条创建副本，返回 `created` 和 `failed`（含批内 index） |
+| GET | `/:id/history` | 当前版本在前，之后按时间倒序排列旧版 |
+| POST | `/:id/restore` | 请求 `{version, revision}`，恢复旧版为新版本 |
+
+知识点新增 `category`（空串表示未分类）、`tags`（字符串数组）、`revision`（从1递增）、`history`（内部快照数组）。旧记录缺省按空分类、空标签、版本1读取，不执行批量迁移；首次实际更新开始保存历史。列表和普通详情不返回 history，备份仅白名单业务字段。
+
+PUT 可以携带预期 revision，前端始终传入；旧调用方不传仍兼容，但无法检测其读取后已发生的修改。模型更新采用原子版本条件，冲突返回409。恢复也要求预期 revision，恢复所有业务字段；无变化保存不新增版本。每次变更保存原版本，最多10个旧版本且旧版 JSON UTF-8总大小不超过300000字节；超过时删除最旧快照，避免文档无限增长。
+
+导入 JSON 格式：`{format:"feynman-knowledge",version:1,knowledgePoints:[{title,content,status,reviewList,category,tags}]}`。单批1–30条，HTTP JSON上限1MB。可传同长度 importKeys 数组（每项16–80位字母、数字或横线）；同用户、同key、同业务内容映射到固定编号，重试不重复创建。前端为每个预览项生成随机key。重新导入文件生成新副本，不合并或覆盖旧记录。不信任文件中的 user、_id、history 等字段。
+
+后端强制校验：标题1–120字符、正文1–20000字符、分类0–40字符、标签最多10个且每个1–20字符；状态枚举与复习标记类型同原约定。导入整批先校验，非法项导致400且该批不写入；数据库故障时可能部分成功，客户端按 returned failed重试。403表示跨用户，404表示记录或历史不存在，409表示版本冲突。
+
+在 `backend/` 执行 `npm run test:lesson6` 使用内存替身验证 HTTP 与业务，不连接云端。真实 CloudBase 结果单独记录在变更记录中。

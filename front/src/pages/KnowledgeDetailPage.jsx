@@ -3,6 +3,10 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import apiClient, { getApiErrorMessage } from '../api/client'
 import MarkdownRenderer from '../components/MarkdownRenderer'
 import StatusBadge from '../components/StatusBadge'
+import Icon from '../components/Icon'
+import PageState from '../components/PageState'
+import KnowledgeHistory from '../components/KnowledgeHistory'
+import { exportMarkdown } from '../utils/knowledgeTransfer'
 
 function describeError(requestError) {
   const status = requestError?.response?.status
@@ -16,6 +20,7 @@ export default function KnowledgeDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [point, setPoint] = useState(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
@@ -52,66 +57,79 @@ export default function KnowledgeDetailPage() {
     setError('')
     try {
       await apiClient.delete(`/knowledge-points/${id}`)
-      navigate('/knowledge', { replace: true, state: { message: '知识点已删除' } })
+      navigate('/knowledge', {
+        replace: true,
+        state: { message: '知识点已删除' },
+      })
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, '删除失败，请稍后重试'))
       setDeleting(false)
     }
   }
 
-  if (loading) {
+  if (loading) return <PageState loading />
+  if (error && !point)
     return (
-      <section className="knowledge-page">
-        <div className="empty-state">
-          <span className="loader" />
-          正在加载知识点…
-        </div>
-      </section>
+      <PageState title="无法打开这个知识点" message={error} retry={loadPoint}>
+        <Link className="button" to="/knowledge">
+          返回知识库
+        </Link>
+      </PageState>
     )
-  }
-
-  if (error && !point) {
-    return (
-      <section className="knowledge-page">
-        <div className="empty-state">
-          <span className="empty-icon">◇</span>
-          <h3>无法打开这个知识点</h3>
-          <p>{error}</p>
-          <Link className="button button-primary button-small" to="/knowledge">
-            返回知识点列表
-          </Link>
-        </div>
-      </section>
-    )
-  }
 
   return (
-    <section className="knowledge-page detail-page">
-      <div className="page-header">
-        <div>
-          <span className="eyebrow">KNOWLEDGE DETAIL</span>
-          <h1>{point.title}</h1>
-          <div className="detail-meta">
-            <StatusBadge status={point.status} />
-            {point.reviewList && <span className="review-flag">待复习</span>}
-            <span className="muted-label">创建于 {new Date(point.createdAt).toLocaleString('zh-CN')}</span>
-            {point.updatedAt && point.updatedAt !== point.createdAt && (
-              <span className="muted-label">更新于 {new Date(point.updatedAt).toLocaleString('zh-CN')}</span>
-            )}
+    <section className="knowledge-page detail-page reader-page">
+      <header className="detail-header">
+        <div className="detail-title-row">
+          <Link className="back-link" to="/knowledge" aria-label="返回知识库">
+            <Icon name="arrow" size={18} />
+            <span>返回知识库</span>
+          </Link>
+          <h1 title={point.title}>{point.title}</h1>
+          <div className="detail-actions">
+            <button className="button" onClick={() => setHistoryOpen(true)}>
+              历史
+            </button>
+            <button className="button" onClick={() => exportMarkdown(point)}>
+              导出 MD
+            </button>
+            <Link
+              className="button button-primary button-small"
+              to={`/knowledge/${point._id}/edit`}
+            >
+              <Icon name="edit" size={18} />
+              编辑
+            </Link>
+            <button
+              className="button button-ghost button-small danger"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? '正在删除…' : '删除'}
+            </button>
           </div>
         </div>
-        <div className="detail-actions">
-          <Link className="button button-primary button-small" to={`/knowledge/${point._id}/edit`}>
-            编辑 <span>✎</span>
-          </Link>
-          <button className="button button-ghost button-small" onClick={handleDelete} disabled={deleting}>
-            {deleting ? '正在删除…' : '删除'}
-          </button>
-          <Link className="button button-ghost button-small" to="/knowledge">
-            返回列表
-          </Link>
+        <div className="detail-meta">
+          {point.category && (
+            <span className="category-chip">{point.category}</span>
+          )}
+          {(point.tags || []).map((tag) => (
+            <span className="tag-chip" key={tag}>
+              #{tag}
+            </span>
+          ))}
+          <StatusBadge status={point.status} />
+          {point.reviewList && <span className="review-flag">待复习</span>}
+          <span
+            className="muted-label"
+            title={`创建于 ${new Date(point.createdAt).toLocaleString('zh-CN')}`}
+          >
+            {point.updatedAt && point.updatedAt !== point.createdAt
+              ? '更新于 ' + new Date(point.updatedAt).toLocaleString('zh-CN')
+              : '创建于 ' + new Date(point.createdAt).toLocaleString('zh-CN')}
+          </span>
         </div>
-      </div>
+      </header>
 
       {notice && <p className="form-success">{notice}</p>}
       {error && (
@@ -120,9 +138,20 @@ export default function KnowledgeDetailPage() {
         </p>
       )}
 
-      <article className="detail-body">
+      <article className="detail-body" tabIndex={0} aria-label="知识点正文">
         <MarkdownRenderer content={point.content} />
       </article>
+      {historyOpen && (
+        <KnowledgeHistory
+          point={point}
+          onClose={() => setHistoryOpen(false)}
+          onRestored={(updated) => {
+            setPoint(updated)
+            setHistoryOpen(false)
+            setNotice('已恢复为新版本，原内容保留在历史中')
+          }}
+        />
+      )}
     </section>
   )
 }
