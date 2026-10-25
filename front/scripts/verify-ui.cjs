@@ -173,11 +173,14 @@ const token =
   await page.getByLabel('筛选状态').selectOption('all')
   passed.push('搜索与状态筛选')
   await page.getByRole('link', { name: '学习概览' }).click()
-  await page.locator('.recent-row').first().waitFor()
-  assert.equal(await page.locator('.recent-row').count(), 5)
-  assert.match(await page.locator('.stat-card').first().innerText(), /7/)
+  await page.locator('.overview-note-row').first().waitFor()
+  assert.equal(await page.locator('.overview-note-row').count(), 7)
+  assert.match(
+    await page.getByRole('button', { name: /全部知识点/ }).innerText(),
+    /7/,
+  )
   await page.screenshot({ path: `${out}/overview-mobile.png`, fullPage: true })
-  passed.push('接口响应统计与最近 5 条（隔离数据）')
+  passed.push('接口响应统计与完整笔记列表（隔离数据）')
   await page.getByRole('link', { name: '新建知识点' }).click()
   await page.getByLabel('知识点标题').fill('新增测试')
   await page.getByLabel('知识点正文').fill(fixtureBody)

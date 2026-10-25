@@ -1,8 +1,10 @@
+import { normalizeOverviewReturn } from './overviewFilters'
+
 // 只接受站内的两个列表入口；直接打开详情时默认返回知识库。
 export function getKnowledgeReturn(state) {
-  const returnTo = state?.returnTo === '/overview' ? '/overview' : '/knowledge'
+  const overview = normalizeOverviewReturn(state?.returnTo)
   return {
-    returnTo,
-    returnLabel: returnTo === '/overview' ? '返回学习概览' : '返回知识库',
+    returnTo: overview || '/knowledge',
+    returnLabel: overview ? '返回学习概览' : '返回知识库',
   }
 }

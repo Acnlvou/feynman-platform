@@ -110,52 +110,52 @@ export default function KnowledgePage() {
               placeholder="搜索标题或正文…"
             />
           </label>
-          <label className="filter-label">
-            <span>状态</span>
-            <select
-              aria-label="筛选状态"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-            >
-              <option value="all">全部状态</option>
-              <option value="not_started">未开始</option>
-              <option value="in_progress">学习中</option>
-              <option value="mastered">已掌握</option>
-            </select>
-          </label>
-        </div>
-        <div className="classification-filters">
-          <label>
-            分类
-            <select
-              aria-label="筛选分类"
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-            >
-              <option value="all">全部分类</option>
-              <option value="uncategorized">未分类</option>
-              {categories.map((value) => (
-                <option key={value} value={'value:' + value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            标签
-            <select
-              aria-label="筛选标签"
-              value={tag}
-              onChange={(event) => setTag(event.target.value)}
-            >
-              <option value="all">全部标签</option>
-              {tags.map((value) => (
-                <option key={value} value={'value:' + value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="library-filters">
+            <label className="filter-label">
+              <span>状态</span>
+              <select
+                aria-label="筛选状态"
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+              >
+                <option value="all">全部状态</option>
+                <option value="not_started">未开始</option>
+                <option value="in_progress">学习中</option>
+                <option value="mastered">已掌握</option>
+              </select>
+            </label>
+            <label className="filter-label">
+              <span>分类</span>
+              <select
+                aria-label="筛选分类"
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+              >
+                <option value="all">全部分类</option>
+                <option value="uncategorized">未分类</option>
+                {categories.map((value) => (
+                  <option key={value} value={'value:' + value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-label">
+              <span>标签</span>
+              <select
+                aria-label="筛选标签"
+                value={tag}
+                onChange={(event) => setTag(event.target.value)}
+              >
+                <option value="all">全部标签</option>
+                {tags.map((value) => (
+                  <option key={value} value={'value:' + value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
         {message && (
           <p className="form-success" role="status">

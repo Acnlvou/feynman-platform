@@ -1,3 +1,5 @@
+import { getKnowledgeReturn } from './knowledgeNavigation'
+
 export const TOKEN_KEY = 'feynman_token'
 
 // 这里只校验前端会话所需字段；Token 签名仍由后端验证。
@@ -62,7 +64,7 @@ export function getLoginDestination(from) {
       hash: typeof from.hash === 'string' ? from.hash : '',
     },
     state: {
-      returnTo: from.state?.returnTo === '/overview' ? '/overview' : '/knowledge',
+      returnTo: getKnowledgeReturn(from.state).returnTo,
     },
   }
 }
