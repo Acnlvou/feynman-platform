@@ -9,7 +9,11 @@ function documentsFrom(result) {
 
 async function findOne(criteria) {
   return runDatabaseRequest(async (db) => {
-    const result = await db.collection(COLLECTION).where(criteria).limit(1).get();
+    const result = await db
+      .collection(COLLECTION)
+      .where(criteria)
+      .limit(1)
+      .get();
     return documentsFrom(result)[0] || null;
   });
 }
@@ -27,4 +31,30 @@ async function deleteById(id) {
   return runDatabaseRequest((db) => db.collection(COLLECTION).doc(id).remove());
 }
 
-module.exports = { create, deleteById, findOne };
+async function recordLlmMetric(id, provider, outcome, elapsed) {
+  return runDatabaseRequest((db) => {
+    const base = `llmMetrics.${provider}`;
+    return db
+      .collection(COLLECTION)
+      .doc(id)
+      .update({
+        [`${base}.calls`]: db.command.inc(1),
+        [`${base}.${outcome}`]: db.command.inc(1),
+        ...(outcome === 'cancelled'
+          ? {}
+          : { [`${base}.durationMs`]: db.command.inc(Math.max(0, elapsed)) }),
+      });
+  });
+}
+async function llmMetrics(id) {
+  return runDatabaseRequest(async (db) => {
+    const result = await db
+      .collection(COLLECTION)
+      .where({ _id: id })
+      .field({ llmMetrics: true })
+      .limit(1)
+      .get();
+    return documentsFrom(result)[0]?.llmMetrics || {};
+  });
+}
+module.exports = { recordLlmMetric, llmMetrics, create, deleteById, findOne };

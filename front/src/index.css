@@ -2440,3 +2440,125 @@ textarea::placeholder {
     flex-wrap: wrap;
   }
 }
+
+/* 第八课：评价弹窗与复习闭环，沿用固定工作台。 */
+.ai-evaluation-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 22px;
+  overscroll-behavior: contain;
+}
+.ai-evaluation-body section {
+  margin: 16px 0;
+}
+.ai-evaluation-body h3 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+.ai-evaluation-body li {
+  margin-bottom: 8px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.ai-plain-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+}
+.ai-result-summary {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 0;
+}
+.ai-result-summary strong {
+  font-size: 36px;
+  color: var(--blue);
+  white-space: nowrap;
+}
+.ai-result-summary small {
+  font-size: 14px;
+  color: var(--muted);
+}
+.ai-result-summary > span {
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.overview-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.overview-review {
+  margin-bottom: 20px;
+}
+.overview-review .recent-row {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+.ai-metrics {
+  margin-top: 20px;
+}
+.ai-metrics > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 14px 18px;
+  font-size: 14px;
+}
+.ai-metrics-content {
+  padding: 0 18px 16px;
+}
+.ai-metrics-table {
+  overflow: auto;
+  margin-top: 12px;
+}
+.ai-metrics-table table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ai-metrics-table th,
+.ai-metrics-table td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+.record-history-body article > .button {
+  margin-top: 6px;
+}
+@media (max-width: 760px) {
+  .overview-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .overview-review .recent-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .overview-review .recent-row .status-badge {
+    display: none;
+  }
+  .ai-evaluation-body {
+    padding: 12px 14px;
+  }
+  .ai-result-summary {
+    gap: 12px;
+  }
+  .ai-result-summary strong {
+    font-size: 28px;
+  }
+  .record-footer .record-buttons {
+    gap: 4px;
+  }
+  .record-footer .record-buttons .button {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  .record-history-body article > .button {
+    min-height: 44px;
+  }
+}
+
+.overview-inline-review {
+  display: inline-block;
+  margin-left: 8px;
+  vertical-align: middle;
+}

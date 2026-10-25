@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom'
 import Icon from '../components/Icon'
 import StatusBadge from '../components/StatusBadge'
+import AiMetrics from '../components/AiMetrics'
 import PageState from '../components/PageState'
 import useKnowledgePoints from '../hooks/useKnowledgePoints'
 import { formatDate } from '../utils/knowledge'
 export default function DashboardPage() {
   const { points, loading, error, reload } = useKnowledgePoints()
+  const reviewPoints = points.filter((point) => point.reviewList)
   const stats = [
+    { title: '待复习', value: reviewPoints.length, icon: 'book' },
     { title: '全部知识点', value: points.length, icon: 'book' },
     {
       title: '正在学习',
@@ -49,7 +52,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          <div className="stats-grid">
+          <div className="stats-grid overview-stats">
             {stats.map((stat) => (
               <div className="stat-card" key={stat.title}>
                 <span className="stat-label">
@@ -62,6 +65,28 @@ export default function DashboardPage() {
                 </strong>
               </div>
             ))}
+          </div>
+          <div className="surface overview-review">
+            <div className="section-heading">
+              <h2>待复习知识点</h2>
+              <span className="review-flag">{reviewPoints.length}个</span>
+            </div>
+            {reviewPoints.length ? (
+              reviewPoints.map((point) => (
+                <Link
+                  className="recent-row"
+                  key={point._id}
+                  to={`/knowledge/${point._id}`}
+                >
+                  <Icon name="book" />
+                  <span>{point.title}</span>
+                  <span className="review-flag">待复习</span>
+                  <StatusBadge status={point.status} />
+                </Link>
+              ))
+            ) : (
+              <p className="empty-state-inline">当前没有待复习知识点。</p>
+            )}
           </div>
           <div className="surface">
             <div className="section-heading">
@@ -87,7 +112,14 @@ export default function DashboardPage() {
                   to={`/knowledge/${point._id}`}
                 >
                   <Icon name="book" />
-                  <span>{point.title}</span>
+                  <span>
+                    {point.title}
+                    {point.reviewList && (
+                      <small className="review-flag overview-inline-review">
+                        待复习
+                      </small>
+                    )}
+                  </span>
                   <StatusBadge status={point.status} />
                   <time>{formatDate(point.updatedAt || point.createdAt)}</time>
                 </Link>
@@ -96,6 +128,7 @@ export default function DashboardPage() {
           </div>
         </>
       )}
+      <AiMetrics />
     </section>
   )
 }

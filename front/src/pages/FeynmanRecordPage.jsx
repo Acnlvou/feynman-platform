@@ -5,6 +5,7 @@ import MarkdownRenderer from '../components/MarkdownRenderer'
 import PageState from '../components/PageState'
 import Icon from '../components/Icon'
 import useSpeechRecorder from '../hooks/useSpeechRecorder'
+import AiEvaluation from '../components/AiEvaluation'
 
 const labels = {
   idle: '准备录音',
@@ -26,6 +27,8 @@ export default function FeynmanRecordPage() {
 function RecordSession({ id }) {
   const recorder = useSpeechRecorder()
   const [point, setPoint] = useState(null)
+  const [evaluationTarget, setEvaluationTarget] = useState(null)
+  const [evaluating, setEvaluating] = useState(false)
   const [loading, setLoading] = useState(true)
   const [pointError, setPointError] = useState('')
   const [attempts, setAttempts] = useState([])
@@ -48,7 +51,7 @@ function RecordSession({ id }) {
     'paused',
     'processing',
   ].includes(recorder.status)
-  const hasUnsaved = dirty || phaseBusy || Boolean(busy)
+  const hasUnsaved = dirty || phaseBusy || Boolean(busy) || evaluating
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       hasUnsaved &&
@@ -177,7 +180,7 @@ function RecordSession({ id }) {
       if (alive.current) setBusy('')
     }
   }
-  const save = async () => {
+  const save = async (withEvaluation = false) => {
     if (
       operation.current ||
       phaseBusy ||
@@ -207,6 +210,11 @@ function RecordSession({ id }) {
       setText(response.data.data.text)
       setDirty(false)
       setNotice('复述已保存')
+      if (withEvaluation)
+        setEvaluationTarget({
+          attempt: response.data.data,
+          needsEvaluation: true,
+        })
       // 即使历史刷新失败，已确认的保存结果也立即可见。
       setAttempts((current) =>
         [
@@ -382,6 +390,18 @@ function RecordSession({ id }) {
                     {Number(attempt.duration).toFixed(1)}秒
                   </small>
                   <p>{attempt.text}</p>
+                  <button
+                    className="button button-small"
+                    disabled={Boolean(busy) || phaseBusy}
+                    onClick={() =>
+                      setEvaluationTarget({
+                        attempt,
+                        needsEvaluation: !attempt.hasEvaluation,
+                      })
+                    }
+                  >
+                    {attempt.hasEvaluation ? '查看评价' : 'AI评价'}
+                  </button>
                 </article>
               ))}
             </div>
@@ -420,12 +440,42 @@ function RecordSession({ id }) {
               Boolean(busy) ||
               phaseBusy
             }
-            onClick={save}
+            onClick={() => save(false)}
           >
             {busy === 'save' ? '正在保存…' : '保存复述'}
           </button>
+          <button
+            className="button button-primary"
+            disabled={
+              !recorder.audio || !text.trim() || Boolean(busy) || phaseBusy
+            }
+            onClick={() => save(true)}
+          >
+            保存并AI评价
+          </button>
         </div>
       </footer>
+      {evaluationTarget && (
+        <AiEvaluation
+          pointId={id}
+          attempt={evaluationTarget.attempt}
+          needsEvaluation={evaluationTarget.needsEvaluation}
+          onBusy={setEvaluating}
+          onClose={() => {
+            setEvaluationTarget(null)
+            setEvaluating(false)
+          }}
+          onSaved={(attemptId) =>
+            setAttempts((current) =>
+              current.map((item) =>
+                item._id === attemptId
+                  ? { ...item, hasEvaluation: true }
+                  : item,
+              ),
+            )
+          }
+        />
+      )}
     </section>
   )
 }

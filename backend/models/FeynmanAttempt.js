@@ -69,7 +69,57 @@ async function removeForPoint(user, knowledgePointId) {
     for (const record of batch) await remove(record._id);
   }
 }
+async function acquireEvaluation(record, token) {
+  return request(async (db) => {
+    const result = await db
+      .collection(COLLECTION)
+      .where({
+        _id: record._id,
+        user: record.user,
+        evaluation: db.command.exists(false),
+        ...(record.evaluationLease
+          ? { 'evaluationLease.token': record.evaluationLease.token }
+          : { evaluationLease: db.command.exists(false) }),
+      })
+      .update({ evaluationLease: { token, until: Date.now() + 120000 } });
+    return result.updated > 0;
+  });
+}
+async function finishEvaluation(id, user, token, evaluation) {
+  return request(async (db) => {
+    const result = await db
+      .collection(COLLECTION)
+      .where({
+        _id: id,
+        user,
+        'evaluationLease.token': token,
+        evaluation: db.command.exists(false),
+      })
+      .update({ evaluation, evaluationLease: db.command.remove() });
+    return result.updated > 0;
+  });
+}
+async function releaseEvaluation(id, user, token) {
+  return request((db) =>
+    db
+      .collection(COLLECTION)
+      .where({ _id: id, user, 'evaluationLease.token': token })
+      .update({ evaluationLease: db.command.remove() }),
+  );
+}
+async function setReviewOutcome(id, user, status) {
+  return request((db) =>
+    db
+      .collection(COLLECTION)
+      .where({ _id: id, user })
+      .update({ 'evaluation.reviewStatus': status }),
+  );
+}
 module.exports = {
+  acquireEvaluation,
+  finishEvaluation,
+  releaseEvaluation,
+  setReviewOutcome,
   documentId,
   findById,
   create,

@@ -9,6 +9,7 @@ function publicAttempt(record) {
     text: record.text,
     duration: record.duration,
     createdAt: record.createdAt,
+    hasEvaluation: Boolean(record.evaluation),
   };
 }
 async function recent(user, id) {

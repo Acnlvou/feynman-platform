@@ -2,6 +2,7 @@ const express = require('express');
 const KnowledgePoint = require('../models/KnowledgePoint');
 const service = require('../services/knowledgePoints');
 const attempts = require('../services/feynmanAttempts');
+const evaluation = require('../services/aiEvaluation');
 const Attempt = require('../models/FeynmanAttempt');
 const auth = require('../middleware/auth');
 const { createResponse } = require('../utils/response');
@@ -58,6 +59,37 @@ router.get(
       '查询成功',
     ),
   ),
+);
+router.get(
+  '/:id/attempts/:attemptId/evaluation',
+  endpoint(async (req, res) =>
+    respond(
+      res,
+      await evaluation.read(req.user.id, req.params.id, req.params.attemptId),
+      'AI评价',
+    ),
+  ),
+);
+router.post(
+  '/:id/attempts/:attemptId/evaluate',
+  endpoint(async (req, res) => {
+    const controller = new AbortController();
+    const cancel = () => controller.abort();
+    req.once('aborted', cancel);
+    res.once('close', cancel);
+    try {
+      const data = await evaluation.evaluate(
+        req.user.id,
+        req.params.id,
+        req.params.attemptId,
+        controller.signal,
+      );
+      if (!res.destroyed) respond(res, data, 'AI评价已保存');
+    } finally {
+      req.removeListener('aborted', cancel);
+      res.removeListener('close', cancel);
+    }
+  }),
 );
 router.get(
   '/:id/attempts',

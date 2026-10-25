@@ -202,3 +202,38 @@ PUT 可以携带预期 revision，前端始终传入；旧调用方不传仍兼�
 - 知识点版本历史与JSON备份继续只包含原业务字段，不包含复述或删除标记。新接口不调用或扩展AI评分。
 
 上传在内存处理，请勿在反向代理或外部采集系统中另行启用请求体记录。前端超时或断开会尝试取消上游请求，但已经发送给百度的音频无法撤回，也不能保证不计费。本站不持久化音频不代表百度的服务端数据策略；上线前应按实际使用方式核对服务条款。
+
+## 第8课：多模型评价与复习闭环
+
+### 配置与调用
+
+当前仅启用DeepSeek，需同时配置`DEEPSEEK_API_KEY`和`DEEPSEEK_MODEL`。`.env.example`中的硅基流动、OpenRouter、千帆变量暂时保留，但运行时代码不会读取或调用这些服务。模型从DeepSeek控制台复制有效ID，须支持system消息、非流式Chat Completions及足够的上下文；正文最多20000字符、复述最多5000字符。本实现不默认猜模型ID，不承诺模型或调用免费。
+
+评价请求只调用DeepSeek的官方HTTPS Chat Completions接口，由Node原生fetch发送，不新增SDK依赖。服务错误或非法输出会返回错误供用户处理，不切换其他供应商。
+
+服务端Prompt明确将参考原文和复述视为资料，不执行资料指令，要求按准确性50/覆盖度30/清晰度20评分；原文不足时需说明。结果必须是仅包含polishedText、strengths、issues、suggestions、整数score的JSON对象；润色1–6000字符，各数组最多8项、每项1–600字符，分数0–100。严格校验；非法输出不猜测修复，也不切换其他服务。响应体上限256000字节。
+
+单次20秒、整轮90秒时限；DeepSeek网络、认证/额度/限流、服务错误和非法输出均返回错误，用户可检查配置后手动重试。可识别的安全拒绝立即停止；用户取消也停止。每用户1轮、每进程最多4轮，超出429；该进程限流不能当作跨进程全局限流。
+
+### 接口及数据
+
+| 方法与路径 | 行为 |
+| --- | --- |
+| POST `/api/knowledge-points/:id/attempts/:attemptId/evaluate` | 无需提交文字；校验归属后读取已保存复述，生成或复用评价并补做复习标记 |
+| GET `/api/knowledge-points/:id/attempts/:attemptId/evaluation` | 只读评价，未评价404，不产生模型调用 |
+| GET `/api/ai/metrics` | 本人DeepSeek调用统计，不返回用户隐私字段 |
+
+继续用x-auth-token和统一响应。评价data为`{attemptId,originalText,evaluation,sourceChanged}`。evaluation包含统一反馈字段、provider/providerName/model、durationMs、evaluatedAt、providerAttempts（本轮已尝试的供应商、耗时、安全错误码与结局）、metricsIncomplete、reviewStatus，以及source（title/content/revision/fingerprint）。旧复述不存在evaluation，历史列表只附加hasEvaluation标记，不批量传输评价与原文快照。
+
+复述文档通过条件更新获得120秒租约，包含随机token与until；占用中409，租约过期后可重新尝试，写回必须匹配token且尚无评价。成功结果写入同一feynman_attempts文档，重复POST读取缓存。未落库结果在当前进程暂存10分钟，最多64项，满时拒绝新调用；数据库恢复后的同进程重试可复用结果，重启、换进程、过期后不保证复用。外部调用与数据库不是分布式事务，不承诺严格一次调用或不重复计费。取消只保证停止本地等待，不能撤回已经发出的请求。
+
+低于60分才处理reviewList，状态为pending/applied/failed/source_changed/not_needed。先核对标题正文SHA256指纹，再通过原有版本更新只改reviewList为true，保留知识点历史与status，版本冲突最多重新读取重试一次。高分不取消已有标记；源文本变化保留评价且跳过自动标记。评价先落库，复习失败不丢评价；再次POST仅补做，applied不重复强制设置。复习更新与评价状态记录不是跨文档事务，状态写回失败后可能需要再次核对，不能保证对并发人工操作的全局顺序。
+
+DeepSeek调用后，users文档`llmMetrics.deepseek`原子累加calls、successes/failures/cancelled、durationMs（仅非取消调用）。成功指返回并校验通过的反馈；取消不计服务失败。统计接口返回calls、successes、failures、cancelled、successRate、averageDurationMs及configured；无已完成请求时比例/平均值为null。统计写入失败不影响评价，成功评价记录metricsIncomplete；丢失的统计无法自动补录。
+
+没有新增集合或迁移旧记录，字段按需写入；知识点JSON备份与版本历史不混入复述评价。删除知识点沿用关联复述清理。保存评价前再次检查归属、删除状态，不信任客户端传入原文/评分。错误、日志不包含完整请求、上游响应或密钥。
+
+官方协议来源：
+- DeepSeek：https://api-docs.deepseek.com/api/create-chat-completion/
+
+以上为代码设计与静态审阅记录，非真实服务接通证明；本轮按用户要求不运行测试、构建或浏览器验收。
