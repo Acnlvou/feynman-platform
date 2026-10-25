@@ -7,6 +7,7 @@ import Icon from '../components/Icon'
 import PageState from '../components/PageState'
 import KnowledgeHistory from '../components/KnowledgeHistory'
 import { exportMarkdown } from '../utils/knowledgeTransfer'
+import { getKnowledgeReturn } from '../utils/knowledgeNavigation'
 
 function describeError(requestError) {
   const status = requestError?.response?.status
@@ -19,6 +20,7 @@ export default function KnowledgeDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const { returnTo, returnLabel } = getKnowledgeReturn(location.state)
   const [point, setPoint] = useState(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -47,9 +49,18 @@ export default function KnowledgeDetailPage() {
   useEffect(() => {
     if (location.state?.message) {
       setNotice(location.state.message)
-      navigate(location.pathname, { replace: true, state: null })
+      const nextState = { ...location.state }
+      delete nextState.message
+      navigate(
+        {
+          pathname: location.pathname,
+          search: location.search,
+          hash: location.hash,
+        },
+        { replace: true, state: nextState },
+      )
     }
-  }, [location.state, location.pathname, navigate])
+  }, [location.state, location.pathname, location.search, location.hash, navigate])
 
   const handleDelete = async () => {
     if (!window.confirm('确定要删除这个知识点吗？删除后无法恢复。')) return
@@ -57,7 +68,7 @@ export default function KnowledgeDetailPage() {
     setError('')
     try {
       await apiClient.delete(`/knowledge-points/${id}`)
-      navigate('/knowledge', {
+      navigate(returnTo, {
         replace: true,
         state: { message: '知识点已删除' },
       })
@@ -67,12 +78,12 @@ export default function KnowledgeDetailPage() {
     }
   }
 
-  if (loading) return <PageState loading />
+  if (loading) return <PageState loading fullPage />
   if (error && !point)
     return (
-      <PageState title="无法打开这个知识点" message={error} retry={loadPoint}>
-        <Link className="button" to="/knowledge">
-          返回知识库
+      <PageState fullPage title="无法打开这个知识点" message={error} retry={loadPoint}>
+        <Link className="button" to={returnTo}>
+          {returnLabel}
         </Link>
       </PageState>
     )
@@ -81,15 +92,16 @@ export default function KnowledgeDetailPage() {
     <section className="knowledge-page detail-page reader-page">
       <header className="detail-header">
         <div className="detail-title-row">
-          <Link className="back-link" to="/knowledge" aria-label="返回知识库">
+          <Link className="back-link" to={returnTo} aria-label={returnLabel}>
             <Icon name="arrow" size={18} />
-            <span>返回知识库</span>
+            <span>{returnLabel}</span>
           </Link>
           <h1 title={point.title}>{point.title}</h1>
           <div className="detail-actions">
             <Link
               className="button button-small"
               to={`/knowledge/${point._id}/record`}
+              state={{ returnTo }}
             >
               录音复述
             </Link>
@@ -102,6 +114,7 @@ export default function KnowledgeDetailPage() {
             <Link
               className="button button-primary button-small"
               to={`/knowledge/${point._id}/edit`}
+              state={{ returnTo }}
             >
               <Icon name="edit" size={18} />
               编辑

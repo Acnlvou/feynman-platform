@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import Icon from '../components/Icon'
 import StatusBadge from '../components/StatusBadge'
 import AiMetrics from '../components/AiMetrics'
@@ -6,6 +6,7 @@ import PageState from '../components/PageState'
 import useKnowledgePoints from '../hooks/useKnowledgePoints'
 import { formatDate } from '../utils/knowledge'
 export default function DashboardPage() {
+  const location = useLocation()
   const { points, loading, error, reload } = useKnowledgePoints()
   const reviewPoints = points.filter((point) => point.reviewList)
   const stats = [
@@ -35,11 +36,18 @@ export default function DashboardPage() {
         <div>
           <h1>学习概览</h1>
         </div>
-        <Link className="button button-primary" to="/knowledge/new">
+        <Link
+          className="button button-primary"
+          to="/knowledge/new"
+          state={{ returnTo: '/overview' }}
+        >
           <Icon name="plus" />
           新建知识点
         </Link>
       </div>
+      {location.state?.message && (
+        <p className="form-success">{location.state.message}</p>
+      )}
       {loading ? (
         <PageState loading />
       ) : error ? (
@@ -77,6 +85,7 @@ export default function DashboardPage() {
                   className="recent-row"
                   key={point._id}
                   to={`/knowledge/${point._id}`}
+                  state={{ returnTo: '/overview' }}
                 >
                   <Icon name="book" />
                   <span>{point.title}</span>
@@ -100,7 +109,11 @@ export default function DashboardPage() {
                 title="还没有学习记录"
                 message="创建一个知识点，开始积累你的知识库。"
               >
-                <Link className="button" to="/knowledge/new">
+                <Link
+                  className="button"
+                  to="/knowledge/new"
+                  state={{ returnTo: '/overview' }}
+                >
                   创建知识点
                 </Link>
               </PageState>
@@ -110,6 +123,7 @@ export default function DashboardPage() {
                   className="recent-row"
                   key={point._id}
                   to={`/knowledge/${point._id}`}
+                  state={{ returnTo: '/overview' }}
                 >
                   <Icon name="book" />
                   <span>

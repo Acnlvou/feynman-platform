@@ -463,6 +463,7 @@ textarea::placeholder {
   border-bottom: 1px solid var(--line);
 }
 .knowledge-item {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 16px;
@@ -504,6 +505,17 @@ textarea::placeholder {
 .knowledge-title:hover {
   color: var(--blue);
 }
+.knowledge-title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+.knowledge-title:focus-visible::after {
+  outline: 2px solid var(--blue);
+  outline-offset: -3px;
+  border-radius: 7px;
+}
 .knowledge-item p {
   margin: 8px 0 0;
   font-size: 14px;
@@ -529,6 +541,8 @@ textarea::placeholder {
   white-space: nowrap;
 }
 .knowledge-item-actions {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: 2px;
 }
@@ -574,6 +588,36 @@ textarea::placeholder {
   min-height: 330px;
   text-align: center;
   padding: 35px 24px;
+}
+.page-state.page-state--page {
+  flex: 1;
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.session-expired-banner {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  background: #fff4e5;
+  color: #77501e;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.session-expired-banner .button {
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.session-expired-body {
+  padding: 16px 24px;
+  line-height: 1.8;
 }
 .page-state h2 {
   font-size: 17px;

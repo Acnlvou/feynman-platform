@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import AuthPageShell from '../components/AuthPageShell'
+import { getLoginDestination } from '../utils/authSession'
 
 export default function RegisterPage() {
   const { isAuthenticated, register } = useAuth()
@@ -12,11 +13,9 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const from = location.state?.from
-  const destination = from
-    ? `${from.pathname}${from.search || ''}${from.hash || ''}`
-    : '/knowledge'
-  if (isAuthenticated) return <Navigate to={destination} replace />
+  const destination = getLoginDestination(location.state?.from)
+  if (isAuthenticated)
+    return <Navigate to={destination.to} state={destination.state} replace />
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -24,7 +23,7 @@ export default function RegisterPage() {
     setSubmitting(true)
     try {
       await register(form)
-      navigate(destination, { replace: true })
+      navigate(destination.to, { replace: true, state: destination.state })
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, '注册失败，请稍后重试'))
     } finally {

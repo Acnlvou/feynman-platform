@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import AuthPageShell from '../components/AuthPageShell'
+import { getLoginDestination } from '../utils/authSession'
 
 export default function LoginPage() {
   const { isAuthenticated, login } = useAuth()
@@ -12,11 +13,9 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const from = location.state?.from
-  const destination = from
-    ? `${from.pathname}${from.search || ''}${from.hash || ''}`
-    : '/knowledge'
-  if (isAuthenticated) return <Navigate to={destination} replace />
+  const destination = getLoginDestination(location.state?.from)
+  if (isAuthenticated)
+    return <Navigate to={destination.to} state={destination.state} replace />
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -24,7 +23,7 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       await login(form)
-      navigate(destination, { replace: true })
+      navigate(destination.to, { replace: true, state: destination.state })
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, '登录失败，请检查邮箱和密码'))
     } finally {
@@ -46,6 +45,11 @@ export default function LoginPage() {
       }
     >
       <form className="auth-form" onSubmit={handleSubmit}>
+        {location.state?.reason === 'expired' && (
+          <p className="form-alert" role="status">
+            登录已过期，请重新登录。
+          </p>
+        )}
         {error && (
           <p className="form-alert" role="alert">
             {error}

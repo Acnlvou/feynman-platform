@@ -1,13 +1,17 @@
 import Icon from './Icon'
 export default function PageState({
   loading,
+  fullPage = false,
   title,
   message,
   retry,
   children,
 }) {
   return (
-    <div className="page-state" role={loading ? 'status' : undefined}>
+    <div
+      className={`page-state${fullPage ? ' page-state--page' : ''}`}
+      role={loading ? 'status' : undefined}
+    >
       {loading ? (
         <span className="loader" />
       ) : (

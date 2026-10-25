@@ -9,7 +9,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import Icon from './Icon'
 export default function Layout() {
-  const { user, logout } = useAuth()
+  const { user, logout, sessionExpired, showExpiryPrompt } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const isEditor = /^\/knowledge\/(new|[^/]+\/edit)\/?$/.test(location.pathname)
@@ -119,6 +119,14 @@ export default function Layout() {
           </div>
         </div>
       </header>
+      {sessionExpired && (
+        <div className="session-expired-banner" role="alert">
+          <span>登录已过期，当前内容暂留本页。请先复制需要保留的文字，重新登录后才能保存、识别或评价。</span>
+          <button className="button button-small" onClick={showExpiryPrompt}>
+            重新登录
+          </button>
+        </div>
+      )}
       <main id="main" className="main-content">
         <Outlet />
       </main>

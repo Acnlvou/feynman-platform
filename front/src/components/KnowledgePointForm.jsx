@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useBlocker } from 'react-router-dom'
 import MarkdownRenderer from './MarkdownRenderer'
 import Icon from './Icon'
+import { useAuth } from '../context/AuthContext'
+import useSessionDraft from '../hooks/useSessionDraft'
 export const emptyKnowledgePoint = {
   title: '',
   content: '',
@@ -18,6 +20,8 @@ export default function KnowledgePointForm({
   onSubmit,
   onCancel,
 }) {
+  const { isAuthenticated, discarding } = useAuth()
+  const locked = submitting && isAuthenticated
   const baseline = { ...emptyKnowledgePoint, ...initialValue }
   const [form, setForm] = useState(baseline)
   const [tagText, setTagText] = useState((baseline.tags || []).join('、'))
@@ -33,10 +37,12 @@ export default function KnowledgePointForm({
   const comparable = { ...form, tags }
   const [mode, setMode] = useState('write')
   const dirty = JSON.stringify(comparable) !== JSON.stringify(baseline)
+  useSessionDraft(dirty)
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       dirty &&
-      !submitting &&
+      !discarding &&
+      !locked &&
       (currentLocation.pathname !== nextLocation.pathname ||
         currentLocation.search !== nextLocation.search),
   )
@@ -48,16 +54,17 @@ export default function KnowledgePointForm({
     }
   }, [blocker])
   useEffect(() => {
-    if (!dirty) return
+    if (!dirty || discarding) return
     const prevent = (event) => {
       event.preventDefault()
       event.returnValue = ''
     }
     window.addEventListener('beforeunload', prevent)
     return () => window.removeEventListener('beforeunload', prevent)
-  }, [dirty])
+  }, [dirty, discarding])
   const submit = (event) => {
     event.preventDefault()
+    if (!isAuthenticated) return
     if (!form.title.trim() || !form.content.trim()) return
     if (tagError) return
     onSubmit({
@@ -83,7 +90,7 @@ export default function KnowledgePointForm({
             placeholder="给这个知识点起个名字"
             maxLength={120}
             required
-            disabled={submitting}
+            disabled={locked}
           />
         </label>
         <details className="editor-classification">
@@ -97,7 +104,7 @@ export default function KnowledgePointForm({
                 value={form.category}
                 maxLength={40}
                 placeholder="例如：数学"
-                disabled={submitting}
+                disabled={locked}
                 onChange={(event) =>
                   setForm({ ...form, category: event.target.value })
                 }
@@ -108,7 +115,7 @@ export default function KnowledgePointForm({
               <input
                 value={tagText}
                 placeholder="用逗号或顿号分隔"
-                disabled={submitting}
+                disabled={locked}
                 onChange={(event) => setTagText(event.target.value)}
               />
             </label>
@@ -157,7 +164,7 @@ export default function KnowledgePointForm({
             placeholder="从一个概念、一段思考开始…"
             required
             maxLength={20000}
-            disabled={submitting}
+            disabled={locked}
           />
           <p className="editor-help">
             支持列表、表格、代码、数学公式和 Mermaid 图表。
@@ -193,7 +200,7 @@ export default function KnowledgePointForm({
               <select
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
-                disabled={submitting}
+                disabled={locked}
               >
                 <option value="not_started">未开始</option>
                 <option value="in_progress">学习中</option>
@@ -207,7 +214,7 @@ export default function KnowledgePointForm({
                 onChange={(e) =>
                   setForm({ ...form, reviewList: e.target.checked })
                 }
-                disabled={submitting}
+                disabled={locked}
               />
               加入复习列表
             </label>
@@ -216,7 +223,7 @@ export default function KnowledgePointForm({
         <div className="editor-actions-bar" role="region" aria-label="保存操作">
           <div className="editor-actions-inner">
             <span className="editor-save-hint" role="status">
-              {submitting
+              {locked
                 ? '正在保存，请稍候…'
                 : !form.title.trim()
                   ? '请先填写知识点标题'
@@ -232,7 +239,7 @@ export default function KnowledgePointForm({
                   type="button"
                   className="button"
                   onClick={onCancel}
-                  disabled={submitting}
+                  disabled={locked}
                 >
                   取消
                 </button>
@@ -240,6 +247,7 @@ export default function KnowledgePointForm({
               <button
                 className="button button-primary"
                 disabled={
+                  !isAuthenticated ||
                   submitting ||
                   tagError ||
                   !form.title.trim() ||
@@ -247,7 +255,7 @@ export default function KnowledgePointForm({
                 }
               >
                 <Icon name="check" size={18} />
-                {submitting ? '正在保存…' : submitLabel}
+                {locked ? '正在保存…' : submitLabel}
               </button>
             </div>
           </div>

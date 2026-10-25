@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import apiClient, { getApiErrorMessage } from '../api/client'
 import KnowledgePointForm from '../components/KnowledgePointForm'
 import PageState from '../components/PageState'
 import Icon from '../components/Icon'
+import { getKnowledgeReturn } from '../utils/knowledgeNavigation'
 
 function describeError(requestError) {
   const status = requestError?.response?.status
@@ -15,6 +16,8 @@ function describeError(requestError) {
 export default function KnowledgeEditPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { returnTo, returnLabel } = getKnowledgeReturn(location.state)
   const [initialValue, setInitialValue] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -54,7 +57,7 @@ export default function KnowledgeEditPage() {
       await apiClient.put(`/knowledge-points/${id}`, values)
       navigate(`/knowledge/${id}`, {
         replace: true,
-        state: { message: '知识点已更新' },
+        state: { returnTo, message: '知识点已更新' },
       })
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, '保存失败，请稍后重试'))
@@ -62,12 +65,12 @@ export default function KnowledgeEditPage() {
     }
   }
 
-  if (loading) return <PageState loading />
+  if (loading) return <PageState loading fullPage />
   if (!initialValue)
     return (
-      <PageState title="无法编辑这个知识点" message={error} retry={loadPoint}>
-        <Link className="button" to="/knowledge">
-          返回知识库
+      <PageState fullPage title="无法编辑这个知识点" message={error} retry={loadPoint}>
+        <Link className="button" to={returnTo}>
+          {returnLabel}
         </Link>
       </PageState>
     )
@@ -76,7 +79,11 @@ export default function KnowledgeEditPage() {
     <section className="knowledge-page edit-page editor-page">
       <div className="page-header">
         <div>
-          <Link className="back-link" to={`/knowledge/${id}`}>
+          <Link
+            className="back-link"
+            to={`/knowledge/${id}`}
+            state={{ returnTo }}
+          >
             <Icon name="arrow" size={18} />
             返回详情
           </Link>
@@ -93,7 +100,7 @@ export default function KnowledgeEditPage() {
           submitting={submitting}
           error={error}
           onSubmit={handleSubmit}
-          onCancel={() => navigate(`/knowledge/${id}`)}
+          onCancel={() => navigate(`/knowledge/${id}`, { state: { returnTo } })}
         />
       </div>
     </section>

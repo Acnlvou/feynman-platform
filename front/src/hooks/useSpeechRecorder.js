@@ -229,6 +229,15 @@ export default function useSpeechRecorder() {
     setStatus('recording')
     startTimer()
   }
+  const stopForSession = () => {
+    // 麦克风授权弹窗尚未完成时也要作废请求，授权后立即释放迟到的音轨。
+    if (refs.current.pending && !refs.current.recorder) {
+      dispose()
+      setStatus('idle')
+      return
+    }
+    stop()
+  }
   return {
     status,
     seconds,
@@ -239,6 +248,7 @@ export default function useSpeechRecorder() {
     pause,
     resume,
     stop,
+    stopForSession,
     unsupported: recordingSupport(),
   }
 }

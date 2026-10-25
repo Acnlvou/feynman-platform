@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useBlocker, useParams } from 'react-router-dom'
+import { Link, useBlocker, useLocation, useParams } from 'react-router-dom'
 import apiClient, { getApiErrorMessage } from '../api/client'
 import MarkdownRenderer from '../components/MarkdownRenderer'
 import PageState from '../components/PageState'
 import Icon from '../components/Icon'
 import useSpeechRecorder from '../hooks/useSpeechRecorder'
 import AiEvaluation from '../components/AiEvaluation'
+import { getKnowledgeReturn } from '../utils/knowledgeNavigation'
+import { useAuth } from '../context/AuthContext'
+import useSessionDraft from '../hooks/useSessionDraft'
 
 const labels = {
   idle: '准备录音',
@@ -25,6 +28,9 @@ export default function FeynmanRecordPage() {
   return <RecordSession key={id} id={id} />
 }
 function RecordSession({ id }) {
+  const { isAuthenticated, discarding } = useAuth()
+  const location = useLocation()
+  const { returnTo } = getKnowledgeReturn(location.state)
   const recorder = useSpeechRecorder()
   const [point, setPoint] = useState(null)
   const [evaluationTarget, setEvaluationTarget] = useState(null)
@@ -52,9 +58,18 @@ function RecordSession({ id }) {
     'processing',
   ].includes(recorder.status)
   const hasUnsaved = dirty || phaseBusy || Boolean(busy) || evaluating
+  useSessionDraft(hasUnsaved, () => {
+    recorder.stopForSession()
+    requests.current.forEach((request) => request.abort())
+    operation.current = false
+    setBusy('')
+    setEvaluationTarget(null)
+    setEvaluating(false)
+  })
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       hasUnsaved &&
+      !discarding &&
       (currentLocation.pathname !== nextLocation.pathname ||
         currentLocation.search !== nextLocation.search),
   )
@@ -67,14 +82,14 @@ function RecordSession({ id }) {
     else blocker.reset()
   }, [blocker])
   useEffect(() => {
-    if (!hasUnsaved) return
+    if (!hasUnsaved || discarding) return
     const prevent = (event) => {
       event.preventDefault()
       event.returnValue = ''
     }
     window.addEventListener('beforeunload', prevent)
     return () => window.removeEventListener('beforeunload', prevent)
-  }, [hasUnsaved])
+  }, [hasUnsaved, discarding])
   const controller = () => {
     const value = new AbortController()
     requests.current.add(value)
@@ -130,7 +145,7 @@ function RecordSession({ id }) {
   }, [id])
 
   const start = async () => {
-    if (busy || phaseBusy) return
+    if (!isAuthenticated || busy || phaseBusy) return
     if (
       hasUnsaved &&
       !window.confirm('重新录制会丢弃本次未保存的录音和文字，确定继续吗？')
@@ -146,7 +161,7 @@ function RecordSession({ id }) {
     if (alive.current && started) setDirty(true)
   }
   const transcribe = async () => {
-    if (!recorder.audio || operation.current || phaseBusy) return
+    if (!isAuthenticated || !recorder.audio || operation.current || phaseBusy) return
     if (text.trim() && !window.confirm('重新识别将替换当前文字，确定继续吗？'))
       return
     operation.current = true
@@ -182,6 +197,7 @@ function RecordSession({ id }) {
   }
   const save = async (withEvaluation = false) => {
     if (
+      !isAuthenticated ||
       operation.current ||
       phaseBusy ||
       !recorder.audio ||
@@ -233,15 +249,16 @@ function RecordSession({ id }) {
     }
   }
 
-  if (loading) return <PageState loading />
+  if (loading) return <PageState loading fullPage />
   if (pointError || !point)
     return (
       <PageState
+        fullPage
         title="无法打开录音复述"
         message={pointError}
         retry={() => reload(loadPoint)}
       >
-        <Link className="button" to={`/knowledge/${id}`}>
+        <Link className="button" to={`/knowledge/${id}`} state={{ returnTo }}>
           返回详情
         </Link>
       </PageState>
@@ -249,7 +266,7 @@ function RecordSession({ id }) {
   return (
     <section className={`record-page record-tab-${tab}`}>
       <header className="record-heading">
-        <Link className="back-link" to={`/knowledge/${id}`}>
+        <Link className="back-link" to={`/knowledge/${id}`} state={{ returnTo }}>
           <Icon name="arrow" size={18} />
           返回详情
         </Link>
@@ -303,7 +320,7 @@ function RecordSession({ id }) {
                 className="button"
                 onClick={start}
                 disabled={
-                  Boolean(busy) || phaseBusy || Boolean(recorder.unsupported)
+                  !isAuthenticated || Boolean(busy) || phaseBusy || Boolean(recorder.unsupported)
                 }
               >
                 {recorder.playback ? '重新录制' : '开始录音'}
@@ -314,7 +331,7 @@ function RecordSession({ id }) {
                 </button>
               )}
               {recorder.status === 'paused' && (
-                <button className="button" onClick={recorder.resume}>
+                <button className="button" onClick={recorder.resume} disabled={!isAuthenticated}>
                   继续
                 </button>
               )}
@@ -366,7 +383,7 @@ function RecordSession({ id }) {
               <button
                 className="button button-small"
                 onClick={() => reload(loadHistory)}
-                disabled={historyLoading || Boolean(busy)}
+                disabled={!isAuthenticated || historyLoading || Boolean(busy)}
               >
                 刷新
               </button>
@@ -392,7 +409,7 @@ function RecordSession({ id }) {
                   <p>{attempt.text}</p>
                   <button
                     className="button button-small"
-                    disabled={Boolean(busy) || phaseBusy}
+                    disabled={!isAuthenticated || Boolean(busy) || phaseBusy}
                     onClick={() =>
                       setEvaluationTarget({
                         attempt,
@@ -422,7 +439,7 @@ function RecordSession({ id }) {
         <div className="record-buttons">
           <button
             className="button"
-            disabled={!recorder.audio || Boolean(busy) || phaseBusy}
+            disabled={!isAuthenticated || !recorder.audio || Boolean(busy) || phaseBusy}
             onClick={transcribe}
           >
             {busy === 'transcribe'
@@ -434,6 +451,7 @@ function RecordSession({ id }) {
           <button
             className="button button-primary"
             disabled={
+              !isAuthenticated ||
               !recorder.audio ||
               !text.trim() ||
               !dirty ||
@@ -447,7 +465,7 @@ function RecordSession({ id }) {
           <button
             className="button button-primary"
             disabled={
-              !recorder.audio || !text.trim() || Boolean(busy) || phaseBusy
+              !isAuthenticated || !recorder.audio || !text.trim() || Boolean(busy) || phaseBusy
             }
             onClick={() => save(true)}
           >

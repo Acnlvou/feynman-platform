@@ -222,6 +222,7 @@ export default function KnowledgePage() {
                       <Link
                         to={`/knowledge/${point._id}`}
                         className="knowledge-title"
+                        state={{ returnTo: '/knowledge' }}
                       >
                         {point.title}
                       </Link>
@@ -254,6 +255,7 @@ export default function KnowledgePage() {
                       <Link
                         className="icon-button"
                         to={`/knowledge/${point._id}/edit`}
+                        state={{ returnTo: '/knowledge' }}
                         aria-label={`编辑${point.title}`}
                       >
                         <Icon name="edit" size={18} />
