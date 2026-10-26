@@ -100,6 +100,13 @@ export default function KnowledgeDetailPage() {
           <div className="detail-actions">
             <Link
               className="button button-small"
+              to={`/knowledge/${point._id}/quiz`}
+              state={{ returnTo }}
+            >
+              开始测评
+            </Link>
+            <Link
+              className="button button-small"
               to={`/knowledge/${point._id}/record`}
               state={{ returnTo }}
             >

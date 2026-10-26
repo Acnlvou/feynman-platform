@@ -3,11 +3,11 @@ const Attempt = require('../models/FeynmanAttempt');
 const User = require('../models/User');
 const knowledge = require('./knowledgePoints');
 const providers = require('./llmProviders');
+const runtime = require('./llmRuntime');
 const fail = (message, status = 400) =>
   Object.assign(new Error(message), { status });
-const activeUsers = new Set();
 // 只暂存未写入数据库的结果，避免数据库瞬时失败后同进程重试再次付费调用。
-const pendingWrites = new Map();
+const pendingWrites = runtime.pending;
 const fingerprint = (point) =>
   createHash('sha256')
     .update(JSON.stringify([point.title, point.content]))
@@ -82,12 +82,10 @@ async function review(user, pointId, attempt) {
 }
 async function evaluate(user, pointId, attemptId, signal) {
   const initial = await owned(user, pointId, attemptId);
-  if (activeUsers.has(user) || activeUsers.size >= 4)
-    throw fail('AI评价正忙，请等待当前评价完成', 429);
-  activeUsers.add(user);
+  const release = runtime.acquire(user);
   let token;
   let leased = false;
-  const cacheKey = `${user}:${attemptId}`;
+  const cacheKey = `evaluation:${user}:${attemptId}`;
   const controller = new AbortController();
   const cancel = () => controller.abort();
   signal.addEventListener('abort', cancel, { once: true });
@@ -114,14 +112,14 @@ async function evaluate(user, pointId, attemptId, signal) {
       );
     if (!cached && pendingWrites.size >= 64)
       throw fail('暂存结果等待保存，请稍后重试', 503);
-    token = randomUUID();
-    leased = await Attempt.acquireEvaluation(initial.attempt, token);
-    if (!leased) throw fail('评价状态已变化，请重新打开评价', 409);
     if (!cached)
       pendingWrites.set(cacheKey, {
         evaluation: null,
         until: Date.now() + 600000,
       });
+    token = randomUUID();
+    leased = await Attempt.acquireEvaluation(initial.attempt, token);
+    if (!leased) throw fail('评价状态已变化，请重新打开评价', 409);
     let evaluation = cached?.evaluation;
     if (!evaluation) {
       const source = {
@@ -239,7 +237,7 @@ async function evaluate(user, pointId, attemptId, signal) {
     }
     if (pendingWrites.get(cacheKey)?.evaluation === null)
       pendingWrites.delete(cacheKey);
-    activeUsers.delete(user);
+    release();
   }
 }
 async function metrics(user) {

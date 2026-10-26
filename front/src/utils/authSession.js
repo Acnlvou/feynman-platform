@@ -55,7 +55,7 @@ export function getLoginDestination(from) {
   const pathname = from?.pathname
   if (
     typeof pathname !== 'string' ||
-    !/^\/(?:overview|knowledge(?:\/[^/]+(?:\/(?:edit|record))?)?)\/?$/.test(pathname)
+    !/^\/(?:overview|knowledge(?:\/[^/]+(?:\/(?:edit|record|quiz))?)?)\/?$/.test(pathname)
   ) return { to: '/knowledge', state: null }
   return {
     to: {

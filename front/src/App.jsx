@@ -19,8 +19,9 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import KnowledgeCreatePage from './pages/KnowledgeCreatePage'
 import FeynmanRecordPage from './pages/FeynmanRecordPage'
+import QuizPage from './pages/QuizPage'
 
-// 离开录音页经 useBlocker 确认后才会到达这里，避免取消离开却先丢失登录态。
+// 离开录音/测评页经useBlocker确认后才到达这里，避免取消离开却先丢失登录态。
 function LogoutPage() {
   const { logout } = useAuth()
   const navigate = useNavigate()
@@ -52,6 +53,7 @@ const router = createBrowserRouter(
           <Route path="/knowledge/:id" element={<KnowledgeDetailPage />} />
           <Route path="/knowledge/:id/edit" element={<KnowledgeEditPage />} />
           <Route path="/knowledge/:id/record" element={<FeynmanRecordPage />} />
+          <Route path="/knowledge/:id/quiz" element={<QuizPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

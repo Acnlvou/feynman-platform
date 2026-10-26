@@ -28,7 +28,9 @@ function errorHandler(err, req, res, next) {
           null,
           err.collectionName === 'feynman_attempts'
             ? '复述数据库暂不可用，请确认 feynman_attempts 集合已创建并检查后端数据库配置'
-            : 'CloudBase 数据库暂不可用，请检查环境 ID、服务端 API Key 和数据库集合配置',
+            : err.collectionName === 'feynman_quizzes'
+              ? '测评数据库暂不可用，请确认 feynman_quizzes 集合已创建并检查后端数据库配置'
+              : 'CloudBase 数据库暂不可用，请检查环境 ID、服务端 API Key 和数据库集合配置',
           err.code || err.requestId || 'CLOUDBASE_UNAVAILABLE',
         ),
       );

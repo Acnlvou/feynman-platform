@@ -38,7 +38,7 @@ export default function AiMetrics() {
       <summary>AI服务记录</summary>
       <div className="ai-metrics-content">
         <p className="muted-copy">
-          仅统计你的 DeepSeek 调用；成功率与平均耗时不含取消请求。评价结果校验失败也计为失败；缺少的历史统计无法补录。
+          仅统计你的 DeepSeek 调用，包括复述评价、出题和简答评分；单选判分不调用模型。成功率与平均耗时不含取消请求，模型结果校验失败也计为失败；缺少的历史统计无法补录。
         </p>
         <button
           className="button button-small"

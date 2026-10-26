@@ -4,10 +4,12 @@ const service = require('../services/knowledgePoints');
 const attempts = require('../services/feynmanAttempts');
 const evaluation = require('../services/aiEvaluation');
 const Attempt = require('../models/FeynmanAttempt');
+const Quiz = require('../models/FeynmanQuiz');
 const auth = require('../middleware/auth');
 const { createResponse } = require('../utils/response');
 const router = express.Router();
 router.use(auth);
+router.use('/:id/quizzes', require('./quizzes'));
 const endpoint = (handler) => async (req, res, next) => {
   try {
     await handler(req, res);
@@ -159,6 +161,7 @@ router.delete(
       allowDeleting: true,
     });
     await KnowledgePoint.markDeleting(point);
+    await Quiz.removeForPoint(req.user.id, point._id);
     await Attempt.removeForPoint(req.user.id, point._id);
     await KnowledgePoint.deleteById(point._id);
     respond(res, null, '知识点删除成功');

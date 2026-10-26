@@ -38,7 +38,7 @@ npm run dev      # 开发模式（nodemon 自动重启）
 
 浏览器打开 <http://localhost:3000/> 应看到 `Hello, Feynman Learner!`。
 
-首次使用前，在 CloudBase 文档数据库中创建 `users` 与 `knowledge_points` 两个集合。若 CloudBase 配置缺失或连接失败，服务依然会启动；数据库接口会返回 503，根路由仍可用于本地调试。
+首次使用前，在 CloudBase 文档数据库中创建 `users`、`knowledge_points`、`feynman_attempts`、`feynman_quizzes` 集合，均由后端访问；复述与测评使用ADMINONLY权限。第9课新增的`feynman_quizzes`应在启用更新后的后端前创建，关联删除也会查询该集合。若 CloudBase 配置缺失或连接失败，服务依然会启动；数据库接口会返回 503，根路由仍可用于本地调试。
 
 ## 环境变量
 
@@ -237,3 +237,42 @@ DeepSeek调用后，users文档`llmMetrics.deepseek`原子累加calls、successe
 - DeepSeek：https://api-docs.deepseek.com/api/create-chat-completion/
 
 以上为代码设计与静态审阅记录，非真实服务接通证明；本轮按用户要求不运行测试、构建或浏览器验收。
+
+## 第9课：DeepSeek出题与测评
+
+### 配置及数据
+
+新增文档集合`feynman_quizzes`，用户手动创建并设置ADMINONLY权限后再启用更新。使用现有CloudBase服务端Key以及DeepSeek Key/MODEL，不增加供应商配置或应用依赖。缺集合或数据库故障返回503及明确的测评集合提示。
+
+每条文档是一道题及一次正式作答：`user,knowledgePointId,requestKey,type,difficulty,createdAt,source,question,generation,answer,submittedAt,result,lease,operationError`。source保存标题、正文、版本和SHA256指纹；question含标准答案/答案要点，仅后端持有；generation/result保存供应商、模型、耗时、时间及统计不完整标记，result另有score/isCorrect/explanation/reviewStatus。不保存密钥或原始上游对象。
+
+知识点删除先标记deleting，再按所属用户清理测评、复述，最后删除知识点；失败保留删除状态，可重试。测评不混入知识点版本历史或JSON备份。部署前必须创建新集合，关联删除也依赖它；不要把连接检查users成功当成新集合可用证明。
+
+### 接口
+
+以下均使用x-auth-token，返回`{success,data,message,error}`。知识点及测评归属由服务端验证，写入前再次检查知识点删除状态。
+
+| 方法与路径 | 输入与行为 |
+| --- | --- |
+| POST `/api/knowledge-points/:id/quizzes` | `{type,difficulty,requestKey}`；生成或复用题目，返回publicQuiz |
+| GET `/api/knowledge-points/:id/quizzes` | 最近20条摘要，含编号、题型、难度、题干摘要、创建时间、状态；已完成时附分数/对错 |
+| GET `/api/knowledge-points/:id/quizzes/:quizId` | 只读publicQuiz，不出题、不评分、不补做复习 |
+| POST `/api/knowledge-points/:id/quizzes/:quizId/answer` | `{answer}`；提交或复用评分，并补做复习标记，返回publicQuiz |
+
+type限定`single-choice/short-answer`，difficulty限定`basic/medium/hard`；requestKey为16–80位字母、数字或横线，用户+知识点+标识确定文档ID。同标识改变题型/难度返回409。原文快照固定于首次创建，原文变化后希望针对新内容练习应使用新的requestKey。
+
+publicQuiz含`_id,type,difficulty,createdAt,status,requestKey,knowledgePointId,sourceTitle,sourceRevision,sourceChanged,operationError,generation`；出题成功后附`question:{text,options?}`；接受作答后附`answer,submittedAt`；评分完成后附`result`，此时才公开correctAnswer或answerKeyPoints。列表和未完成题目不会泄露标准答案或评分要点。状态为generating/generation_failed/awaiting_answer/grading/grading_failed/completed；无活动租约的未完成阶段可由用户手动重试。
+
+单选答案为A/B/C/D，服务端直接判0或100，不调用模型；简答trim后1–5000字符，评分0–100整数，60分为答对边界。服务端原子接受答案后不可更改，原样重试读取结果或恢复评分，不同答案409。首次提交尚未被接受时，读取记录可确认真实状态。
+
+出题JSON严格校验字段、题型、难度和长度：题干1–2000、四个不同选项各1–1000、解析1–3000、简答要点1–8条且每条1–1000。评分只接受score和explanation，解释1–3000。原文不足允许特定cannotGenerate响应并转成422。Prompt将原文、题目、学生答案作为资料，不执行其中指令；不执行模型代码或修补猜测的答案。
+
+### 可靠性与复习
+
+第8/9课共享本进程的每用户1轮、最多4轮AI业务限制，以及最多64项待补存容量；单进程限制不等于分布式全局限流。单次DeepSeek20秒、整轮90秒，CloudBase SDK请求本身不能由AbortSignal回滚；不自动重试、不切换供应商。每次真实模型尝试累计到本人llmMetrics.deepseek，取消单独统计，统计失败不丢业务结果。
+
+生成和评分用120秒token租约及条件更新。答案与评分租约原子写入；结果必须匹配租约且对应阶段尚无成功结果才能写回。模型成功后在本进程暂存10分钟，数据库写入失败原样重试优先补存；容量满时拒绝新工作，空占位失败后释放。进程重启、多进程切换、过期、时钟偏差或数据库长时间阻塞均不能保证严格一次外部调用，已发出的请求可能计费。
+
+答错仅更新reviewList=true，先核对原文指纹，再沿用知识点revision条件更新及历史保护；冲突重读一次。高分不清标记、不改status。复习状态pending/applied/failed/source_changed/not_needed；评分先保存，复习失败不丢结果，重复答案POST只补做。applied后不会因重复查看强制恢复标记；知识点更新与测评状态写回跨文档，不保证事务或并发人工操作的全局顺序，写回失败会独立告警。
+
+本轮为代码及静态审阅交付，未运行测试/构建/服务、浏览器或真实模型验证。保留原讲义；讲义的前端单选比较示例改为服务端判分，以隐藏标准答案并保护归属与结果。

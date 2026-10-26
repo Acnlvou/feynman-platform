@@ -14,12 +14,14 @@ export default function Layout() {
   const location = useLocation()
   const isEditor = /^\/knowledge\/(new|[^/]+\/edit)\/?$/.test(location.pathname)
   const isRecord = /^\/knowledge\/[^/]+\/record\/?$/.test(location.pathname)
+  const isQuiz = /^\/knowledge\/[^/]+\/quiz\/?$/.test(location.pathname)
   const isDetail =
     /^\/knowledge\/[^/]+\/?$/.test(location.pathname) && !isEditor
   const isCompact =
     isEditor ||
     isDetail ||
     isRecord ||
+    isQuiz ||
     ['/knowledge', '/overview'].includes(location.pathname)
   const [open, setOpen] = useState(false)
   const menu = useRef(null)
@@ -47,7 +49,7 @@ export default function Layout() {
   }, [open])
   return (
     <div
-      className={`app-shell${isEditor ? ' app-shell--editor' : ''}${isCompact ? ' app-shell--compact' : ''}${isDetail ? ' app-shell--reader' : ''}${isRecord ? ' app-shell--record' : ''}`}
+      className={`app-shell${isEditor ? ' app-shell--editor' : ''}${isCompact ? ' app-shell--compact' : ''}${isDetail ? ' app-shell--reader' : ''}${isRecord ? ' app-shell--record' : ''}${isQuiz ? ' app-shell--quiz' : ''}`}
     >
       <a className="skip-link" href="#main">
         跳到正文
@@ -103,7 +105,7 @@ export default function Layout() {
                       )
                         return
                     }
-                    if (isRecord) {
+                    if (isRecord || isQuiz) {
                       navigate('/logout')
                       return
                     }
@@ -121,7 +123,7 @@ export default function Layout() {
       </header>
       {sessionExpired && (
         <div className="session-expired-banner" role="alert">
-          <span>登录已过期，当前内容暂留本页。请先复制需要保留的文字，重新登录后才能保存、识别或评价。</span>
+          <span>登录已过期，当前内容暂留本页。请先复制需要保留的文字，重新登录后才能保存、识别或进行AI操作。</span>
           <button className="button button-small" onClick={showExpiryPrompt}>
             重新登录
           </button>

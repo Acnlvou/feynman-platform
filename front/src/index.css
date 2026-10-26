@@ -2601,6 +2601,251 @@ textarea::placeholder {
   color: var(--muted);
   white-space: nowrap;
 }
+
+/* 第九课：操作固定，题目、答案和反馈在工作区内部滚动。 */
+.app-shell--quiz .main-content {
+  display: flex;
+  overflow: hidden;
+  padding: 8px 40px 12px;
+}
+.quiz-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  gap: 10px;
+}
+.quiz-heading {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+}
+.quiz-heading .back-link,
+.quiz-heading .button {
+  flex-shrink: 0;
+}
+.quiz-heading .back-link {
+  padding: 8px 0;
+}
+.quiz-heading h1 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 20px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.quiz-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px 20px;
+}
+.quiz-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.quiz-toolbar select {
+  min-height: 44px;
+}
+.quiz-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+}
+.quiz-content {
+  padding: 20px 24px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.quiz-question-meta {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.quiz-options {
+  min-width: 0;
+  border: 0;
+  margin: 20px 0;
+  padding: 0;
+}
+.quiz-options legend {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.quiz-option {
+  display: grid;
+  grid-template-columns: 18px 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 12px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.quiz-option.selected {
+  background: #edf2ff;
+  border-color: var(--blue);
+}
+.quiz-option input {
+  padding: 0;
+  min-height: 18px;
+  margin: 4px 0 0;
+  accent-color: var(--blue);
+  width: 18px;
+  height: 18px;
+}
+.quiz-option strong {
+  line-height: 1.8;
+}
+.quiz-option .markdown-body {
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.8;
+}
+.quiz-option .markdown-body > :first-child {
+  margin-top: 0;
+}
+.quiz-option .markdown-body > :last-child {
+  margin-bottom: 0;
+}
+.quiz-short-answer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0;
+  font-size: 14px;
+}
+.quiz-short-answer > span,
+.quiz-model {
+  color: var(--muted);
+  font-size: 12px;
+}
+.quiz-short-answer textarea {
+  flex: 1 0 100%;
+  width: 100%;
+  min-height: 160px;
+  max-height: 320px;
+  line-height: 1.8;
+}
+.quiz-result {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  margin-top: 20px;
+}
+.quiz-result li {
+  margin: 8px 0;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.quiz-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 10px;
+}
+.quiz-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.quiz-history-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 18px;
+}
+.quiz-history-row {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 14px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  color: var(--ink);
+  background: white;
+  overflow-wrap: anywhere;
+}
+.quiz-history-row:hover {
+  background: var(--paper);
+}
+.quiz-history-row span,
+.quiz-history-row time {
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .app-shell.app-shell--compact.app-shell--quiz .main-content {
+    padding: 6px 12px 10px;
+  }
+  .quiz-heading {
+    gap: 8px;
+  }
+  .quiz-heading h1 {
+    font-size: 16px;
+  }
+  .quiz-heading .button {
+    padding: 8px;
+    min-height: 44px;
+    font-size: 12px;
+  }
+  .quiz-toolbar {
+    gap: 8px;
+  }
+  .quiz-toolbar label {
+    flex: 1;
+    min-width: 0;
+  }
+  .quiz-toolbar select {
+    flex: 1;
+    min-width: 0;
+  }
+  .quiz-toolbar > span {
+    display: none;
+  }
+  .quiz-content {
+    padding: 14px;
+  }
+  .quiz-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .quiz-footer > span {
+    font-size: 11px;
+  }
+  .quiz-actions .button {
+    flex: 1;
+    min-height: 44px;
+    padding: 8px;
+    font-size: 12px;
+  }
+}
 .ai-metrics {
   margin-top: 20px;
 }

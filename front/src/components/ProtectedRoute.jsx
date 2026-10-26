@@ -40,7 +40,7 @@ export default function ProtectedRoute() {
       {keepDraft && retained.prompt && !discarding && (
         <Modal title="登录已过期" onClose={dismissExpiryPrompt}>
           <div className="session-expired-body">
-            <p>当前文字和本地录音还在本页。重新登录将离开此页，未保存内容会丢失，可先保留并复制文字。</p>
+            <p>当前未保存的文字、答案或本地录音还在本页。重新登录将离开此页，未保存内容会丢失，可先保留并复制文字。</p>
           </div>
           <div className="modal-footer">
             <button className="button" onClick={dismissExpiryPrompt}>
