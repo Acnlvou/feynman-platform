@@ -41,6 +41,11 @@ async function create(
       category,
       tags,
       revision: 1,
+      contentRevision: 1,
+      vectorIndexStatus: 'pending',
+      vectorIndexedRevision: null,
+      vectorIndexModel: null,
+      vectorIndexErrorCode: null,
       history: [],
       createdAt: now,
       updatedAt: now,
@@ -96,6 +101,8 @@ async function updateById(point, fields) {
       Buffer.byteLength(JSON.stringify(history), 'utf8') > 300000
     )
       history.shift();
+    const contentChanged =
+      Object.hasOwn(fields, 'title') || Object.hasOwn(fields, 'content');
     const result = await db
       .collection(COLLECTION)
       .where({
@@ -108,11 +115,36 @@ async function updateById(point, fields) {
       .update({
         ...fields,
         revision: (point.revision || 1) + 1,
+        contentRevision: contentChanged
+          ? (point.contentRevision || point.revision || 1) + 1
+          : point.contentRevision || point.revision || 1,
         history,
         updatedAt: new Date(),
       });
     if (!result.updated) return null;
     return readDocument(db, point._id);
+  });
+}
+
+async function setVectorIndexState(id, user, expectedRevision, state) {
+  return runDatabaseRequest(async (db) => {
+    const revisionCondition =
+      expectedRevision === undefined
+        ? db.command.exists(false)
+        : expectedRevision;
+    const fields = {
+      vectorIndexStatus: state.status,
+      vectorIndexErrorCode: state.errorCode || null,
+    };
+    if (state.status === 'ready') {
+      fields.vectorIndexedRevision = state.indexedRevision;
+      fields.vectorIndexModel = state.model;
+    }
+    const result = await db
+      .collection(COLLECTION)
+      .where({ _id: id, user, revision: revisionCondition })
+      .update(fields);
+    return Boolean(result.updated);
   });
 }
 
@@ -137,5 +169,6 @@ module.exports = {
   deleteById,
   findById,
   findByUser,
+  setVectorIndexState,
   updateById,
 };

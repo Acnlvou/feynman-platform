@@ -2,11 +2,12 @@
 
 > Web 框架：**Express 4**；运行时：**Node.js**；数据库：腾讯云 **CloudBase 文档数据库**，通过 CloudBase 服务端 SDK 访问。
 
-《大前端与AI实战》实训课第 1–3 课的实战产物：一个基于 Node.js + Express 的后端服务，提供用户注册/登录（JWT 认证）与知识点 CRUD 能力。课程讲义仍按 Mongoose/Atlas 教学；为使用当前腾讯云数据库环境，工程数据库适配层改为 CloudBase SDK，HTTP 接口保持不变。
+《大前端与AI实战》实训项目的后端服务，基于 Node.js + Express，提供用户注册/登录（JWT 认证）、知识点 CRUD、复述/测评以及第10课向量索引能力。课程讲义仍按 Mongoose/Atlas 教学；为使用当前腾讯云数据库环境，工程数据库适配层改为 CloudBase SDK，HTTP 接口保持不变。
 
 ## 环境要求
 
 - Node.js 18 LTS 及以上（推荐 20 / 22）
+- 安装 `hnswlib-node` 时，若没有适用的预编译二进制文件，需要本机 Node-gyp C/C++ 编译环境
 - 腾讯云 CloudBase 环境，以及该环境的服务端 API Key
 - 可选：Postman 或 curl 用于接口测试
 
@@ -23,6 +24,7 @@ npm install
 cp .env.example .env
 
 # 3. 编辑 .env，填好 CLOUDBASE_ENV_ID、CLOUDBASE_APIKEY 和 JWT_SECRET
+# 第10课需要时，另填 SILICONFLOW_API_KEY 与 SILICONFLOW_EMBEDDING_MODEL
 
 # 4. 启动
 npm start        # 生产模式
@@ -50,6 +52,8 @@ npm run dev      # 开发模式（nodemon 自动重启）
 | `CLOUDBASE_APIKEY` | CloudBase 服务端 API Key；只存后端 `.env`，绝不能放入前端或提交到仓库 | 仅本地配置 |
 | `JWT_SECRET` | JWT 签名密钥，请用足够长的随机串 | `a_very_long_random_string` |
 | `JWT_EXPIRE` | JWT 有效期 | `5h` |
+| `SILICONFLOW_API_KEY` | 第10课 Embedding 的硅基流动 Bearer Key，仅后端使用 | 仅本地配置 |
+| `SILICONFLOW_EMBEDDING_MODEL` | 第10课单独指定向量模型，不与生成模型配置共用 | `BAAI/bge-m3` |
 
 `.env` 已被 `.gitignore` 忽略，**不会**进入版本库，也**不会**被打进分发压缩包。对外只提供 `.env.example`。
 
@@ -65,6 +69,10 @@ backend/
 ├─ models/
 │   ├─ User.js               # 用户模型
 │   └─ KnowledgePoint.js     # 知识点模型
+├─ services/
+│   ├─ knowledgePoints.js    # 知识点业务流程与索引队列
+│   ├─ siliconflowEmbeddings.js # 硅基流动 Embedding 适配
+│   └─ vectorStoreService.js # HNSWLib 本地索引
 ├─ routes/
 │   ├─ users.js              # 注册 / 登录
 │   └─ knowledgePoints.js    # 知识点 CRUD
@@ -75,6 +83,8 @@ backend/
 │   └─ response.js           # 统一响应格式
 └─ .env.example              # 环境变量示例
 ```
+
+本地 HNSWLib 文件位于 `backend/.data/vector_store/`，由后端生成并已加入 Git 忽略；不要手工编辑或提交。知识点正文仍以 CloudBase 为准。
 
 ## 接口清单
 
@@ -94,6 +104,8 @@ backend/
 | GET | `/api/knowledge-points/:id` | 查询单个知识点 | 是 |
 | PUT | `/api/knowledge-points/:id` | 更新知识点 | 是 |
 | DELETE | `/api/knowledge-points/:id` | 删除知识点 | 是 |
+| POST | `/api/knowledge-points/:id/index` | 校验本人索引可读取；缺失、过期或损坏时重建 | 是 |
+| POST | `/api/knowledge-points/index-all` | 强制重建本人全部知识点索引 | 是 |
 
 认证方式：请求头携带 `x-auth-token: <你的 Token>`。
 
@@ -207,7 +219,7 @@ PUT 可以携带预期 revision，前端始终传入；旧调用方不传仍兼�
 
 ### 配置与调用
 
-当前仅启用DeepSeek，需同时配置`DEEPSEEK_API_KEY`和`DEEPSEEK_MODEL`。`.env.example`中的硅基流动、OpenRouter、千帆变量暂时保留，但运行时代码不会读取或调用这些服务。模型从DeepSeek控制台复制有效ID，须支持system消息、非流式Chat Completions及足够的上下文；正文最多20000字符、复述最多5000字符。本实现不默认猜模型ID，不承诺模型或调用免费。
+第8/9课的模型生成当前仅启用DeepSeek，需同时配置`DEEPSEEK_API_KEY`和`DEEPSEEK_MODEL`；硅基流动的 API Key 另供第10课 Embedding 使用，其他供应商生成模型变量仍是保留项。模型从DeepSeek控制台复制有效ID，须支持system消息、非流式Chat Completions及足够的上下文；正文最多20000字符、复述最多5000字符。本实现不默认猜模型ID，不承诺模型或调用免费。
 
 评价请求只调用DeepSeek的官方HTTPS Chat Completions接口，由Node原生fetch发送，不新增SDK依赖。服务错误或非法输出会返回错误供用户处理，不切换其他供应商。
 
@@ -276,3 +288,34 @@ publicQuiz含`_id,type,difficulty,createdAt,status,requestKey,knowledgePointId,s
 答错仅更新reviewList=true，先核对原文指纹，再沿用知识点revision条件更新及历史保护；冲突重读一次。高分不清标记、不改status。复习状态pending/applied/failed/source_changed/not_needed；评分先保存，复习失败不丢结果，重复答案POST只补做。applied后不会因重复查看强制恢复标记；知识点更新与测评状态写回跨文档，不保证事务或并发人工操作的全局顺序，写回失败会独立告警。
 
 本轮为代码及静态审阅交付，未运行测试/构建/服务、浏览器或真实模型验证。保留原讲义；讲义的前端单选比较示例改为服务端判分，以隐藏标准答案并保护归属与结果。
+
+## 第10课：RAG 知识入库
+
+### 配置与分块
+
+在后端配置 `SILICONFLOW_API_KEY` 与独立的 `SILICONFLOW_EMBEDDING_MODEL=BAAI/bge-m3`。适配器使用硅基流动 `POST https://api.siliconflow.cn/v1/embeddings`，请求头为 `Authorization: Bearer ...`，正文为 `{model,input}`。Embedding 输入按当前 API 格式支持字符串数组；本实现每批最多发送8个分块，每次请求30秒超时。`BAAI/bge-m3` 文档列出的最大输入长度为8192 tokens；课程分块仍按500字/重叠50字执行。服务端校验响应条目、序号、维数与有限数值，不记录 Key 或原始上游响应。
+
+正文与标题组合后按 Unicode 字符分块，目标每块最多500字、相邻块重叠50字，优先在标点处切分。每个用户与知识点组合有独立 HNSWLib cosine 索引，目录名为两者组合的 SHA-256；索引含 HNSW 文件、分块文本/元数据和 manifest。元数据记录用户、知识点编号、内容版本和分块位置。临时索引构建完整后才替换旧索引；索引文件权限限制为当前系统用户。CloudBase 知识点正文是权威数据，本地文件是可重建的派生索引。
+
+### 自动更新、重建与状态
+
+新建、导入、标题/正文变更和版本恢复会把索引加入后台队列，最多并行处理2条。索引版本使用 `contentRevision`：只有标题或正文变化才递增；普通 `revision` 仍代表包括状态、分类和标签在内的全部知识点变更。因此只改状态、分类、标签或复习标记不会调用 Embedding。构建失败不回滚已保存的笔记；`vectorIndexStatus` 标为 `failed`，错误只以安全错误码展示，之后可以手动重试。删除先标记知识点，再删除对应本地索引与测评/复述记录；任一步失败保留删除标记，可再次调用删除继续清理。
+
+知识点详情及列表额外返回 `contentRevision`、`vectorIndexStatus`、`vectorIndexedRevision`、`vectorIndexModel` 和 `vectorIndexErrorCode`。状态可能为 `unindexed`（旧数据尚未处理）、`pending`、`ready` 或 `failed`；“已加入队列”不代表已完成，需查看后续知识点状态。
+
+| 方法与地址 | 行为 | 返回 |
+| --- | --- | --- |
+| POST `/api/knowledge-points/:id/index` | 仅按认证身份查找本人索引；验证索引文件可读取且版本匹配时返回ready，否则排队重建 | HTTP 200 ready或HTTP 202 pending，含知识点编号与内容版本 |
+| POST `/api/knowledge-points/index-all` | 对认证用户现有的全部未删除知识点加入强制重建队列 | HTTP 202，每条知识点的状态/内容版本及无法排队项 |
+
+新建、导入、正文/标题编辑和版本恢复会按分块调用 Embedding，可能产生供应商费用；全部重建会对每条知识点强制重新调用，可能重复计费。只在有硅基流动额度和凭据时手动执行。新建/编辑即使未配置硅基流动也会保存笔记，状态变为失败，配置完成后可用单条或全部重建接口补齐。响应仅接受身份令牌，不读取请求体里的用户编号；单条操作会先校验知识点归属。笔记分块会发送给硅基流动处理，配置前请确认其适用于你存储的内容。
+
+### 手动验收与运行边界
+
+本地验收时配置硅基流动凭据后重启后端：依次新建知识点、改标题/正文、导入、恢复旧版本，观察内容版本增加且索引变为 `ready`；仅改状态/标签时确认内容版本不变；尝试重建他人知识点应返回403；删除后确认索引目录清理。另分别缺少凭据、制造供应商超时/错误，确认笔记仍保存且状态可重试；后端重启后对本人笔记发单条索引检查，确认 HNSW 文件可读取并识别为当前版本。全部重建会重新请求向量，不作为无成本的状态检查。
+
+这是单后端实例、持久本机磁盘的教学原型。多实例、容器临时盘或无持久卷环境不适用，需另行设计共享向量存储与任务协调。当前没有第11课检索问答或聊天接口。本轮未配置或请求真实硅基流动服务，也未运行自动测试、构建、服务或浏览器验收；Node 原生 HNSWLib 依赖仅完成本机依赖编译。
+
+官方协议：
+- [硅基流动 Embedding API](https://api-docs.siliconflow.cn/docs/api/embeddings-post)
+- [硅基流动 API Key 创建说明](https://docs.siliconflow.cn/docs/userguide/quickstart)

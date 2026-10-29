@@ -6,6 +6,7 @@
 **/dist/
 **/build/
 **/.vite/
+backend/.data/
 *.log
 npm-debug.log*
 

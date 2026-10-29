@@ -1,7 +1,150 @@
 const KnowledgePoint = require('../models/KnowledgePoint');
 const { createHash } = require('node:crypto');
+const vectorStore = require('./vectorStoreService');
 const FIELDS = ['title', 'content', 'status', 'reviewList', 'category', 'tags'];
 const STATUSES = ['not_started', 'in_progress', 'mastered'];
+const MAX_VECTOR_INDEX_JOBS = 2;
+const vectorQueue = [];
+const vectorJobs = new Map();
+let activeVectorJobs = 0;
+
+function vectorJobKey(user, id) {
+  return JSON.stringify([user, id]);
+}
+
+function safeIndexErrorCode(error) {
+  const code = error?.code;
+  return typeof code === 'string' && /^[A-Z0-9_.-]{1,80}$/.test(code)
+    ? code
+    : 'VECTOR_INDEX_FAILED';
+}
+
+function enqueueVectorIndex(point, { force = false } = {}) {
+  const key = vectorJobKey(point.user, point._id);
+  const current = vectorJobs.get(key);
+  if (current) {
+    current.rerun = true;
+    current.forceNext ||= force;
+    return;
+  }
+  const job = {
+    key,
+    user: point.user,
+    id: point._id,
+    forceNext: force,
+    rerun: false,
+  };
+  vectorJobs.set(key, job);
+  vectorQueue.push(job);
+  pumpVectorQueue();
+}
+
+function pumpVectorQueue() {
+  while (
+    activeVectorJobs < MAX_VECTOR_INDEX_JOBS &&
+    vectorQueue.length > 0
+  ) {
+    const job = vectorQueue.shift();
+    activeVectorJobs += 1;
+    void runVectorIndexJob(job)
+      .catch((error) => {
+        console.warn('[vector-index] job stopped:', safeIndexErrorCode(error));
+      })
+      .finally(() => {
+        if (vectorJobs.get(job.key) === job) vectorJobs.delete(job.key);
+        activeVectorJobs -= 1;
+        pumpVectorQueue();
+      });
+  }
+}
+
+async function runVectorIndexJob(job) {
+  while (true) {
+    job.rerun = false;
+    const force = job.forceNext;
+    job.forceNext = false;
+    const point = await KnowledgePoint.findById(job.id);
+    if (!point || point.user !== job.user || point.deleting) return;
+
+    try {
+      const isCurrent = !force && (await vectorStore.isIndexCurrent(point));
+      if (isCurrent) {
+        const saved = await KnowledgePoint.setVectorIndexState(
+          point._id,
+          point.user,
+          point.revision,
+          {
+            status: 'ready',
+            indexedRevision: vectorStore.contentRevision(point),
+            model: vectorStore.currentModel(),
+          },
+        );
+        if (saved && !job.rerun) return;
+        continue;
+      }
+
+      const marked = await KnowledgePoint.setVectorIndexState(
+        point._id,
+        point.user,
+        point.revision,
+        { status: 'pending' },
+      );
+      if (!marked) continue;
+
+      const result = await vectorStore.indexKnowledgePoint(point, { force });
+      const latest = await KnowledgePoint.findById(job.id);
+      if (!latest || latest.user !== job.user || latest.deleting) return;
+      if (
+        result.status !== 'ready' ||
+        vectorStore.contentRevision(latest) !== result.revision
+      ) {
+        continue;
+      }
+
+      const saved = await KnowledgePoint.setVectorIndexState(
+        latest._id,
+        latest.user,
+        latest.revision,
+        {
+          status: 'ready',
+          indexedRevision: result.revision,
+          model: result.model,
+        },
+      );
+      if (saved && !job.rerun) return;
+    } catch (error) {
+      const latest = await KnowledgePoint.findById(job.id).catch(() => null);
+      if (latest?.user === job.user && !latest.deleting) {
+        const saved = await KnowledgePoint.setVectorIndexState(
+          latest._id,
+          latest.user,
+          latest.revision,
+          { status: 'failed', errorCode: safeIndexErrorCode(error) },
+        ).catch(() => false);
+        if (!saved && !job.rerun) return;
+      } else {
+        return;
+      }
+      if (!job.rerun) return;
+    }
+  }
+}
+
+async function markVectorIndexPending(point) {
+  let current = point;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const saved = await KnowledgePoint.setVectorIndexState(
+      current._id,
+      current.user,
+      current.revision,
+      { status: 'pending' },
+    );
+    if (saved) return current;
+    current = await KnowledgePoint.findById(point._id);
+    if (!current || current.user !== point.user || current.deleting) return null;
+  }
+  return current;
+}
 function failure(message, status = 400) {
   return Object.assign(new Error(message), { status });
 }
@@ -60,6 +203,11 @@ function publicPoint(point) {
     category: data.category || '',
     tags: data.tags || [],
     revision: data.revision || 1,
+    contentRevision: data.contentRevision || data.revision || 1,
+    vectorIndexStatus: data.vectorIndexStatus || 'unindexed',
+    vectorIndexedRevision: data.vectorIndexedRevision ?? null,
+    vectorIndexModel: data.vectorIndexModel ?? null,
+    vectorIndexErrorCode: data.vectorIndexErrorCode ?? null,
   };
 }
 function exportFields(point) {
@@ -78,23 +226,37 @@ async function owned(id, user, { allowDeleting = false } = {}) {
   return point;
 }
 async function create(user, input) {
-  return publicPoint(await KnowledgePoint.create({ user, ...validate(input) }));
+  const point = await KnowledgePoint.create({ user, ...validate(input) });
+  enqueueVectorIndex(point);
+  return publicPoint(point);
 }
 async function update(point, input) {
-  const fields = validate(input, true);
+  const suppliedFields = validate(input, true);
   if (
     input.revision !== undefined &&
     (!Number.isInteger(input.revision) ||
       input.revision !== (point.revision || 1))
   )
     throw failure('内容已在其他页面更新，请重新打开后再保存', 409);
-  const changed = Object.keys(fields).some(
-    (key) =>
-      JSON.stringify(fields[key]) !== JSON.stringify(publicPoint(point)[key]),
+  const fields = Object.fromEntries(
+    Object.entries(suppliedFields).filter(
+      ([key, value]) =>
+        JSON.stringify(value) !==
+        JSON.stringify(publicPoint(point)[key]),
+    ),
   );
+  const changed = Object.keys(fields).length > 0;
   if (!changed) return publicPoint(point);
+  const contentChanged = ['title', 'content'].some((field) =>
+    Object.hasOwn(fields, field),
+  );
+  if (contentChanged) {
+    fields.vectorIndexStatus = 'pending';
+    fields.vectorIndexErrorCode = null;
+  }
   const result = await KnowledgePoint.updateById(point, fields);
   if (!result) throw failure('内容已发生变化，请重新加载后再操作', 409);
+  if (contentChanged) enqueueVectorIndex(result);
   return publicPoint(result);
 }
 function history(point) {
@@ -152,6 +314,9 @@ async function importPoints(user, body) {
           if (!point) throw error;
         }
       }
+      if (point.user !== user) throw failure('导入记录归属不正确', 403);
+      if (point.deleting) throw failure('该知识点正在删除', 409);
+      enqueueVectorIndex(point);
       created.push({ index, point: publicPoint(point) });
     } catch (error) {
       failed.push({ index, message: '该条导入失败，请稍后重试' });
@@ -159,6 +324,65 @@ async function importPoints(user, body) {
   }
   return { created, failed };
 }
+
+async function reindexPoint(id, user) {
+  let point = await owned(id, user);
+  if (await vectorStore.isIndexCurrent(point)) {
+    const saved = await KnowledgePoint.setVectorIndexState(
+      point._id,
+      point.user,
+      point.revision,
+      {
+        status: 'ready',
+        indexedRevision: vectorStore.contentRevision(point),
+        model: vectorStore.currentModel(),
+      },
+    );
+    if (saved) {
+      return {
+        knowledgePointId: point._id,
+        status: 'ready',
+        revision: vectorStore.contentRevision(point),
+      };
+    }
+    point = await owned(id, user);
+  }
+  const current = await markVectorIndexPending(point);
+  if (!current) throw failure('该知识点正在删除，无法重建索引', 409);
+  enqueueVectorIndex(current);
+  return {
+    knowledgePointId: current._id,
+    status: 'pending',
+    revision: vectorStore.contentRevision(current),
+  };
+}
+
+async function reindexAll(user) {
+  const points = await KnowledgePoint.findByUser(user);
+  const items = [];
+  const failed = [];
+  for (const point of points) {
+    if (point.user !== user || point.deleting) continue;
+    try {
+      const current = await markVectorIndexPending(point);
+      if (!current) continue;
+      enqueueVectorIndex(current, { force: true });
+      items.push({
+        knowledgePointId: current._id,
+        status: 'pending',
+        revision: vectorStore.contentRevision(current),
+      });
+    } catch (error) {
+      failed.push({
+        knowledgePointId: point._id,
+        status: 'failed',
+        errorCode: safeIndexErrorCode(error),
+      });
+    }
+  }
+  return { scheduled: items.length, items, failed };
+}
+
 module.exports = {
   validate,
   publicPoint,
@@ -169,4 +393,6 @@ module.exports = {
   history,
   restore,
   importPoints,
+  reindexPoint,
+  reindexAll,
 };

@@ -5,6 +5,7 @@ const attempts = require('../services/feynmanAttempts');
 const evaluation = require('../services/aiEvaluation');
 const Attempt = require('../models/FeynmanAttempt');
 const Quiz = require('../models/FeynmanQuiz');
+const vectorStore = require('../services/vectorStoreService');
 const auth = require('../middleware/auth');
 const { createResponse } = require('../utils/response');
 const router = express.Router();
@@ -38,6 +39,31 @@ router.post(
       res,
       await service.importPoints(req.user.id, req.body),
       '导入处理完成',
+    );
+  }),
+);
+router.post(
+  '/index-all',
+  endpoint(async (req, res) =>
+    respond(
+      res,
+      await service.reindexAll(req.user.id),
+      '本人知识点索引已加入重建队列',
+      202,
+    ),
+  ),
+);
+router.post(
+  '/:id/index',
+  endpoint(async (req, res) => {
+    const data = await service.reindexPoint(req.params.id, req.user.id);
+    respond(
+      res,
+      data,
+      data.status === 'ready'
+        ? '知识点索引已存在且可读取'
+        : '知识点索引已加入重建队列',
+      data.status === 'ready' ? 200 : 202,
     );
   }),
 );
@@ -161,6 +187,7 @@ router.delete(
       allowDeleting: true,
     });
     await KnowledgePoint.markDeleting(point);
+    await vectorStore.removeKnowledgePoint(req.user.id, point._id);
     await Quiz.removeForPoint(req.user.id, point._id);
     await Attempt.removeForPoint(req.user.id, point._id);
     await KnowledgePoint.deleteById(point._id);
