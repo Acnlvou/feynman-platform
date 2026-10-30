@@ -293,15 +293,15 @@ publicQuiz含`_id,type,difficulty,createdAt,status,requestKey,knowledgePointId,s
 
 ### 配置与分块
 
-在后端配置 `SILICONFLOW_API_KEY` 与独立的 `SILICONFLOW_EMBEDDING_MODEL=BAAI/bge-m3`。适配器使用硅基流动 `POST https://api.siliconflow.cn/v1/embeddings`，请求头为 `Authorization: Bearer ...`，正文为 `{model,input}`。Embedding 输入按当前 API 格式支持字符串数组；本实现每批最多发送8个分块，每次请求30秒超时。`BAAI/bge-m3` 文档列出的最大输入长度为8192 tokens；课程分块仍按500字/重叠50字执行。服务端校验响应条目、序号、维数与有限数值，不记录 Key 或原始上游响应。
+在后端配置 `SILICONFLOW_API_KEY` 与独立的 `SILICONFLOW_EMBEDDING_MODEL=BAAI/bge-m3`。适配器使用硅基流动 `POST https://api.siliconflow.cn/v1/embeddings`，请求头为 `Authorization: Bearer ...`，正文为 `{model,input}`。Embedding 输入按当前 API 格式支持字符串数组；本实现每批最多发送8个分块，每次请求30秒超时。`BAAI/bge-m3` 文档列出的最大输入长度为8192 tokens。服务端校验响应条目、序号、维数与有限数值，不记录 Key 或原始上游响应。
 
-正文与标题组合后按 Unicode 字符分块，目标每块最多500字、相邻块重叠50字，优先在标点处切分。每个用户与知识点组合有独立 HNSWLib cosine 索引，目录名为两者组合的 SHA-256；索引含 HNSW 文件、分块文本/元数据和 manifest。元数据记录用户、知识点编号、内容版本和分块位置。临时索引构建完整后才替换旧索引；索引文件权限限制为当前系统用户。CloudBase 知识点正文是权威数据，本地文件是可重建的派生索引。
+知识点正文交给 LangChain JS `RecursiveCharacterTextSplitter`，设置每块500字符、重叠50字符；标题保留在每个分块的元数据中。默认分隔符优先尝试空行、换行和空格，仍过长时继续细分至字符；这是通用规则切分器，不解析 Markdown AST，也不调用 LLM 判断语义。每个用户与知识点组合有独立 HNSWLib cosine 索引，目录名为两者组合的 SHA-256；索引含 HNSW 文件、分块文本/元数据和 manifest。元数据记录用户、知识点编号、内容版本和分块位置。manifest 记录索引格式、切分器及参数；旧格式索引在单条检查/重建时会视为过期。临时索引构建完整后才替换旧索引；索引文件权限限制为当前系统用户。CloudBase 知识点正文是权威数据，本地文件是可重建的派生索引。
 
 ### 自动更新、重建与状态
 
 新建、导入、标题/正文变更和版本恢复会把索引加入后台队列，最多并行处理2条。索引版本使用 `contentRevision`：只有标题或正文变化才递增；普通 `revision` 仍代表包括状态、分类和标签在内的全部知识点变更。因此只改状态、分类、标签或复习标记不会调用 Embedding。构建失败不回滚已保存的笔记；`vectorIndexStatus` 标为 `failed`，错误只以安全错误码展示，之后可以手动重试。删除先标记知识点，再删除对应本地索引与测评/复述记录；任一步失败保留删除标记，可再次调用删除继续清理。
 
-知识点详情及列表额外返回 `contentRevision`、`vectorIndexStatus`、`vectorIndexedRevision`、`vectorIndexModel` 和 `vectorIndexErrorCode`。状态可能为 `unindexed`（旧数据尚未处理）、`pending`、`ready` 或 `failed`；“已加入队列”不代表已完成，需查看后续知识点状态。
+知识点详情及列表额外返回 `contentRevision`、`vectorIndexStatus`、`vectorIndexedRevision`、`vectorIndexModel` 和 `vectorIndexErrorCode`。详情页展示索引状态；旧数据未索引或任务失败时，可在详情页对单条笔记发起建立/重试。状态可能为 `unindexed`、`pending`、`ready` 或 `failed`；“已加入队列”不代表已完成，详情页会在处理中自动刷新状态。等待约90秒仍为 `pending` 时，页面会提供“重新排队”操作；后台错误会尽量记录安全错误码并将状态改为 `failed`。
 
 | 方法与地址 | 行为 | 返回 |
 | --- | --- | --- |

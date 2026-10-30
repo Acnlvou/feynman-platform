@@ -2,17 +2,19 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { createHash, randomUUID } = require('node:crypto');
 const { HierarchicalNSW } = require('hnswlib-node');
+const { RecursiveCharacterTextSplitter } = require('@langchain/textsplitters');
 const KnowledgePoint = require('../models/KnowledgePoint');
 const embeddings = require('./siliconflowEmbeddings');
 
 const STORE_ROOT = path.join(__dirname, '..', '.data', 'vector_store');
 const CHUNK_SIZE = 500;
 const CHUNK_OVERLAP = 50;
-const BOUNDARIES = new Set([
-  '\n',
-  '。', '！', '？', '；', '，',
-  '.', '!', '?', ';', ',',
-]);
+const INDEX_FORMAT_VERSION = 2;
+const SPLITTER_NAME = 'langchain-RecursiveCharacterTextSplitter';
+const textSplitter = new RecursiveCharacterTextSplitter({
+  chunkSize: CHUNK_SIZE,
+  chunkOverlap: CHUNK_OVERLAP,
+});
 const locks = new Map();
 
 function indexKey(user, knowledgePointId) {
@@ -29,30 +31,11 @@ function contentRevision(point) {
   return point.contentRevision || point.revision || 1;
 }
 
-function splitText(title, content) {
-  const source = (title + '\n' + content).trim();
-  const characters = Array.from(source);
-  const chunks = [];
-  let start = 0;
-
-  while (start < characters.length) {
-    let end = Math.min(start + CHUNK_SIZE, characters.length);
-    if (end < characters.length) {
-      const minimumEnd = start + Math.floor((end - start) * 0.65);
-      for (let cursor = end - 1; cursor >= minimumEnd; cursor -= 1) {
-        if (BOUNDARIES.has(characters[cursor])) {
-          end = cursor + 1;
-          break;
-        }
-      }
-    }
-
-    const text = characters.slice(start, end).join('');
-    if (text.trim()) chunks.push(text);
-    if (end >= characters.length) break;
-    start = Math.max(start + 1, end - CHUNK_OVERLAP);
-  }
-  return chunks;
+async function splitText(content) {
+  const source = (typeof content === 'string' ? content : '').trim();
+  if (!source) return [];
+  const chunks = await textSplitter.splitText(source);
+  return chunks.filter((chunk) => chunk.trim());
 }
 
 async function withPointLock(user, knowledgePointId, operation) {
@@ -86,7 +69,10 @@ async function loadIndex(point) {
     const manifest = await readManifest(directory);
     if (
       !manifest ||
-      manifest.formatVersion !== 1 ||
+      manifest.formatVersion !== INDEX_FORMAT_VERSION ||
+      manifest.splitter !== SPLITTER_NAME ||
+      manifest.chunkSize !== CHUNK_SIZE ||
+      manifest.chunkOverlap !== CHUNK_OVERLAP ||
       manifest.user !== point.user ||
       manifest.knowledgePointId !== point._id ||
       manifest.revision !== contentRevision(point) ||
@@ -146,6 +132,10 @@ function currentModel() {
 }
 
 async function writeIndex(point, force) {
+  const trace = createHash('sha256')
+    .update(JSON.stringify([point.user, point._id]))
+    .digest('hex')
+    .slice(0, 10);
   const current = await KnowledgePoint.findById(point._id);
   if (
     !current ||
@@ -172,7 +162,8 @@ async function writeIndex(point, force) {
   }
 
   const model = embeddings.currentModel();
-  const chunks = splitText(current.title, current.content);
+  const chunks = await splitText(current.content);
+  console.info(`[vector-index:${trace}] split into ${chunks.length} chunks`);
   if (!chunks.length) {
     throw Object.assign(new Error('知识点正文没有可索引内容'), {
       code: 'EMPTY_KNOWLEDGE_POINT',
@@ -180,7 +171,9 @@ async function writeIndex(point, force) {
     });
   }
 
+  console.info(`[vector-index:${trace}] Embedding request started`);
   const vectors = await embeddings.embedTexts(chunks);
+  console.info(`[vector-index:${trace}] Embedding request finished`);
   const dimension = vectors[0]?.length;
   if (
     !dimension ||
@@ -228,7 +221,10 @@ async function writeIndex(point, force) {
     await fs.writeFile(
       path.join(temporary, 'manifest.json'),
       JSON.stringify({
-        formatVersion: 1,
+        formatVersion: INDEX_FORMAT_VERSION,
+        splitter: SPLITTER_NAME,
+        chunkSize: CHUNK_SIZE,
+        chunkOverlap: CHUNK_OVERLAP,
         user: current.user,
         knowledgePointId: current._id,
         revision: contentRevision(current),
@@ -257,6 +253,7 @@ async function writeIndex(point, force) {
     }
 
     await replaceDirectory(temporary, target);
+    console.info(`[vector-index:${trace}] local index saved`);
     const afterReplace = await KnowledgePoint.findById(current._id);
     if (
       !afterReplace ||
