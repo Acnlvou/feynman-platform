@@ -9,6 +9,25 @@ import KnowledgeHistory from '../components/KnowledgeHistory'
 import { exportMarkdown } from '../utils/knowledgeTransfer'
 import { getKnowledgeReturn } from '../utils/knowledgeNavigation'
 
+const vectorIndexCopy = {
+  ready: {
+    label: '已就绪',
+    description: '切分、向量生成和索引保存均已完成',
+  },
+  pending: {
+    label: '处理中',
+    description: '后台正在建立索引，完成后会自动更新状态',
+  },
+  failed: {
+    label: '建立失败',
+    description: '检查配置后可以重试',
+  },
+  unindexed: {
+    label: '尚未建立',
+    description: '这条笔记还没有索引',
+  },
+}
+
 function describeError(requestError) {
   const status = requestError?.response?.status
   if (status === 404) return '这个知识点不存在，可能已被删除。'
@@ -25,6 +44,10 @@ export default function KnowledgeDetailPage() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
+  const [indexSubmitting, setIndexSubmitting] = useState(false)
+  const [indexPollTimedOut, setIndexPollTimedOut] = useState(false)
+  const [indexPollRestart, setIndexPollRestart] = useState(0)
+  const [indexActionError, setIndexActionError] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState(location.state?.message || '')
 
@@ -45,6 +68,46 @@ export default function KnowledgeDetailPage() {
   useEffect(() => {
     loadPoint()
   }, [loadPoint])
+
+  useEffect(() => {
+    if (point?.vectorIndexStatus !== 'pending') {
+      setIndexPollTimedOut(false)
+      return undefined
+    }
+
+    let cancelled = false
+    let attempts = 0
+    let timer
+    const pollStatus = async () => {
+      attempts += 1
+      try {
+        const response = await apiClient.get(`/knowledge-points/${id}`)
+        if (cancelled) return
+        const updatedPoint = response.data.data
+        setPoint(updatedPoint)
+        if (updatedPoint.vectorIndexStatus === 'pending') {
+          if (attempts < 30) {
+            timer = window.setTimeout(pollStatus, 3000)
+          } else {
+            setIndexPollTimedOut(true)
+          }
+        }
+      } catch (requestError) {
+        const status = requestError?.response?.status
+        if (!cancelled && attempts < 30 && (!status || status >= 500)) {
+          timer = window.setTimeout(pollStatus, 5000)
+        } else if (!cancelled && attempts >= 30 && (!status || status >= 500)) {
+          setIndexPollTimedOut(true)
+        }
+      }
+    }
+
+    timer = window.setTimeout(pollStatus, 2000)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [id, point?.vectorIndexStatus, indexPollRestart])
 
   useEffect(() => {
     if (location.state?.message) {
@@ -77,6 +140,65 @@ export default function KnowledgeDetailPage() {
       setDeleting(false)
     }
   }
+
+  const handleIndexRebuild = async () => {
+    setIndexSubmitting(true)
+    setIndexActionError('')
+    try {
+      const response = await apiClient.post(`/knowledge-points/${id}/index`)
+      const result = response.data.data
+      setPoint((current) => {
+        if (!current) return current
+        const status = result.status === 'ready' ? 'ready' : 'pending'
+        return {
+          ...current,
+          vectorIndexStatus: status,
+          vectorIndexErrorCode: null,
+          ...(status === 'ready'
+            ? {
+                vectorIndexedRevision: result.revision,
+                vectorIndexModel: result.model,
+              }
+            : {}),
+        }
+      })
+      setIndexPollTimedOut(false)
+      if (result.status !== 'ready') {
+        setIndexPollRestart((current) => current + 1)
+      }
+    } catch (requestError) {
+      setIndexActionError(
+        getApiErrorMessage(requestError, '索引请求失败，请稍后重试'),
+      )
+    } finally {
+      setIndexSubmitting(false)
+    }
+  }
+
+  const reportedIndexStatus = point?.vectorIndexStatus || 'unindexed'
+  const indexRevisionMatches =
+    point?.vectorIndexedRevision != null &&
+    point?.contentRevision != null &&
+    String(point.vectorIndexedRevision) === String(point.contentRevision)
+  const indexIsStale =
+    reportedIndexStatus === 'ready' && !indexRevisionMatches
+  const indexStatus = indexIsStale
+    ? 'unindexed'
+    : Object.hasOwn(vectorIndexCopy, reportedIndexStatus)
+      ? reportedIndexStatus
+      : 'unindexed'
+  const indexInfo = vectorIndexCopy[indexStatus]
+  const indexDescription = indexIsStale
+    ? '笔记内容已更新，需要重新建立索引'
+    : indexStatus === 'pending' && indexPollTimedOut
+      ? '长时间没有更新，任务可能已中断；可以手动重新排队'
+      : indexStatus === 'failed' && point?.vectorIndexErrorCode
+        ? `错误码：${point.vectorIndexErrorCode}`
+        : indexInfo.description
+  const canRebuildIndex =
+    indexStatus === 'unindexed' ||
+    indexStatus === 'failed' ||
+    (indexStatus === 'pending' && indexPollTimedOut)
 
   if (loading) return <PageState loading fullPage />
   if (error && !point)
@@ -155,6 +277,39 @@ export default function KnowledgeDetailPage() {
               : '创建于 ' + new Date(point.createdAt).toLocaleString('zh-CN')}
           </span>
         </div>
+        <div
+          className={`vector-index-row vector-index-row--${indexStatus}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="vector-index-dot" aria-hidden="true" />
+          <span className="vector-index-label">知识库索引</span>
+          <strong>{indexInfo.label}</strong>
+          <span className="vector-index-description">{indexDescription}</span>
+          {canRebuildIndex && (
+            <button
+              type="button"
+              className="button button-ghost button-small vector-index-action"
+              onClick={handleIndexRebuild}
+              disabled={indexSubmitting}
+            >
+              {indexSubmitting
+                ? '正在提交…'
+                : indexStatus === 'pending'
+                  ? '重新排队'
+                  : indexIsStale
+                    ? '更新索引'
+                    : indexStatus === 'failed'
+                      ? '重试'
+                      : '建立索引'}
+            </button>
+          )}
+        </div>
+        {indexActionError && (
+          <p className="vector-index-alert" role="alert">
+            {indexActionError}
+          </p>
+        )}
       </header>
 
       {notice && <p className="form-success">{notice}</p>}

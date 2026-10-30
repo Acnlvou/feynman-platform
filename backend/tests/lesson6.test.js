@@ -100,6 +100,16 @@ require.cache[config] = {
 };
 process.env.JWT_SECRET = 'lesson6-isolated-test-secret';
 process.env.NODE_ENV = 'production';
+const embeddings = require.resolve('../services/siliconflowEmbeddings');
+require.cache[embeddings] = {
+  id: embeddings,
+  filename: embeddings,
+  loaded: true,
+  exports: {
+    currentModel: () => 'lesson6-test-embedding-model',
+    embedTexts: async (texts) => texts.map(() => [1, 0]),
+  },
+};
 const app = require('../index');
 let server, base;
 const token = (user) =>

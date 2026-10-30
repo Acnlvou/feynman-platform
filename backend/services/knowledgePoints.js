@@ -59,14 +59,19 @@ function pumpVectorQueue() {
 }
 
 async function runVectorIndexJob(job) {
+  const trace = createHash('sha256').update(job.key).digest('hex').slice(0, 10);
   while (true) {
     job.rerun = false;
     const force = job.forceNext;
     job.forceNext = false;
-    const point = await KnowledgePoint.findById(job.id);
-    if (!point || point.user !== job.user || point.deleting) return;
-
     try {
+      // Keep the initial CloudBase read inside the worker's failure handler.
+      // Otherwise a transient read error drops the in-memory job and leaves the
+      // persisted vectorIndexStatus stuck at `pending`.
+      let point = await KnowledgePoint.findById(job.id);
+      if (!point || point.user !== job.user || point.deleting) return;
+      console.info(`[vector-index:${trace}] note loaded`);
+
       const isCurrent = !force && (await vectorStore.isIndexCurrent(point));
       if (isCurrent) {
         const saved = await KnowledgePoint.setVectorIndexState(
@@ -89,9 +94,23 @@ async function runVectorIndexJob(job) {
         point.revision,
         { status: 'pending' },
       );
-      if (!marked) continue;
+      if (!marked) {
+        const latest = await KnowledgePoint.findById(job.id);
+        if (!latest || latest.user !== job.user || latest.deleting) return;
+        if (
+          latest.revision !== point.revision ||
+          latest.vectorIndexStatus !== 'pending'
+        ) {
+          continue;
+        }
+        // CloudBase may report updated: 0 when the document is already pending.
+        // The state is valid; proceed with the build instead of spinning forever.
+        point = latest;
+      }
 
+      console.info(`[vector-index:${trace}] index build started`);
       const result = await vectorStore.indexKnowledgePoint(point, { force });
+      console.info(`[vector-index:${trace}] index build finished: ${result.status}`);
       const latest = await KnowledgePoint.findById(job.id);
       if (!latest || latest.user !== job.user || latest.deleting) return;
       if (
@@ -111,8 +130,10 @@ async function runVectorIndexJob(job) {
           model: result.model,
         },
       );
+      if (saved) console.info(`[vector-index:${trace}] ready state saved`);
       if (saved && !job.rerun) return;
     } catch (error) {
+      console.warn(`[vector-index:${trace}] job failed: ${safeIndexErrorCode(error)}`);
       const latest = await KnowledgePoint.findById(job.id).catch(() => null);
       if (latest?.user === job.user && !latest.deleting) {
         const saved = await KnowledgePoint.setVectorIndexState(

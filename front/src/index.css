@@ -1042,6 +1042,73 @@ textarea::placeholder {
   margin-top: 4px;
   gap: 8px;
 }
+.vector-index-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 10px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.vector-index-row--ready {
+  color: #35734f;
+  background: #edf7f0;
+  border-color: #d9eadf;
+}
+.vector-index-row--pending {
+  color: #886116;
+  background: #fff6e5;
+  border-color: #efe3c7;
+}
+.vector-index-row--failed {
+  color: #a44848;
+  background: #fff1f1;
+  border-color: #efdada;
+}
+.vector-index-row--unindexed {
+  color: #6b7381;
+  background: #f2f4f6;
+  border-color: #e3e7ec;
+}
+.vector-index-dot {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.vector-index-label {
+  color: var(--muted);
+}
+.vector-index-row strong {
+  font-weight: 600;
+}
+.vector-index-description {
+  color: var(--muted);
+}
+.vector-index-action {
+  min-height: 28px;
+  padding: 3px 9px;
+  border-color: currentColor;
+  color: inherit;
+  font-size: 12px;
+}
+.vector-index-action:hover {
+  color: var(--blue);
+}
+.vector-index-alert {
+  margin: 6px 0 0;
+  color: #a44848;
+  font-size: 12px;
+  line-height: 1.6;
+}
 .reader-page .detail-body {
   flex: 1;
   min-height: 0;
@@ -1610,6 +1677,17 @@ textarea::placeholder {
   .reader-page .detail-meta .muted-label {
     flex-basis: auto;
     font-size: 11px;
+  }
+  .reader-page .vector-index-row {
+    gap: 6px 8px;
+    padding: 7px 9px;
+  }
+  .reader-page .vector-index-description {
+    flex-basis: 100%;
+    margin-left: 15px;
+  }
+  .reader-page .vector-index-action {
+    margin-left: 15px;
   }
   .reader-page .detail-body {
     padding: 18px 16px;

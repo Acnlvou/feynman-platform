@@ -144,7 +144,24 @@ async function setVectorIndexState(id, user, expectedRevision, state) {
       .collection(COLLECTION)
       .where({ _id: id, user, revision: revisionCondition })
       .update(fields);
-    return Boolean(result.updated);
+    if (result.updated) return true;
+
+    // CloudBase can report zero updated documents when the target fields
+    // already have these values. Treat that as success only after verifying
+    // ownership, revision, and every requested state field.
+    const current = await readDocument(db, id);
+    const revisionMatches =
+      expectedRevision === undefined
+        ? current?.revision === undefined
+        : current?.revision === expectedRevision;
+    return Boolean(
+      current &&
+        current.user === user &&
+        revisionMatches &&
+        Object.entries(fields).every(([field, value]) =>
+          Object.is(current[field], value),
+        ),
+    );
   });
 }
 
